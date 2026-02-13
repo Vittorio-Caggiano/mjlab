@@ -64,6 +64,7 @@ Table of Contents
 
    source/installation
    source/migration_isaac_lab
+   source/myoskeleton_tracking_from_pypi
 
 .. toctree::
    :maxdepth: 1
