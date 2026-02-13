@@ -72,7 +72,7 @@ uv run train Mjlab-Tracking-Flat-Unitree-G1 --registry-name your-org/motions/mot
 uv run play Mjlab-Tracking-Flat-Unitree-G1 --wandb-run-path your-org/mjlab/run-id
 ```
 
-#### MyoSkeleton Motion Tracking
+### MyoSkeleton Motion Tracking
 
 Train the [MyoSkeleton](https://github.com/MyoHub/myosuite) musculoskeletal model to imitate reference motions (e.g. soccer kicks from `soccer1.npz`):
 
