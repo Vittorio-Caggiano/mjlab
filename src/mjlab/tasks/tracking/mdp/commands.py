@@ -36,23 +36,30 @@ class MotionLoader:
     data = np.load(motion_file)
     self.joint_pos = torch.tensor(data["joint_pos"], dtype=torch.float32, device=device)
     self.joint_vel = torch.tensor(data["joint_vel"], dtype=torch.float32, device=device)
-    self._body_pos_w = torch.tensor(
-      data["body_pos_w"], dtype=torch.float32, device=device
-    )
-    self._body_quat_w = torch.tensor(
-      data["body_quat_w"], dtype=torch.float32, device=device
-    )
-    self._body_lin_vel_w = torch.tensor(
-      data["body_lin_vel_w"], dtype=torch.float32, device=device
-    )
-    self._body_ang_vel_w = torch.tensor(
-      data["body_ang_vel_w"], dtype=torch.float32, device=device
-    )
-    self._body_indexes = body_indexes
-    self.body_pos_w = self._body_pos_w[:, self._body_indexes]
-    self.body_quat_w = self._body_quat_w[:, self._body_indexes]
-    self.body_lin_vel_w = self._body_lin_vel_w[:, self._body_indexes]
-    self.body_ang_vel_w = self._body_ang_vel_w[:, self._body_indexes]
+
+    # NPZ body arrays use MuJoCo global body indices where index 0 is the
+    # world body (always at the origin).  Entity.find_bodies() returns
+    # entity-local indices which start from the entity root body (i.e. they
+    # skip the world body).  Strip the world body here so that entity-local
+    # body_indexes can be used directly.
+    _to = dict(dtype=torch.float32, device=device)
+    entity_body_pos_w = torch.tensor(data["body_pos_w"], **_to)[:, 1:]
+    entity_body_quat_w = torch.tensor(data["body_quat_w"], **_to)[:, 1:]
+    entity_body_lin_vel_w = torch.tensor(data["body_lin_vel_w"], **_to)[:, 1:]
+    entity_body_ang_vel_w = torch.tensor(data["body_ang_vel_w"], **_to)[:, 1:]
+
+    # Root body (entity body 0 = the freejoint body) – used by
+    # _resample_command to initialise the freejoint qpos/qvel.
+    self.root_pos_w = entity_body_pos_w[:, 0]
+    self.root_quat_w = entity_body_quat_w[:, 0]
+    self.root_lin_vel_w = entity_body_lin_vel_w[:, 0]
+    self.root_ang_vel_w = entity_body_ang_vel_w[:, 0]
+
+    # Tracking bodies (filtered by entity-local body_indexes).
+    self.body_pos_w = entity_body_pos_w[:, body_indexes]
+    self.body_quat_w = entity_body_quat_w[:, body_indexes]
+    self.body_lin_vel_w = entity_body_lin_vel_w[:, body_indexes]
+    self.body_ang_vel_w = entity_body_ang_vel_w[:, body_indexes]
     self.time_step_total = self.joint_pos.shape[0]
 
 
@@ -303,10 +310,13 @@ class MotionCommand(CommandTerm):
       assert self.cfg.sampling_mode == "adaptive"
       self._adaptive_sampling(env_ids)
 
-    root_pos = self.body_pos_w[:, 0].clone()
-    root_ori = self.body_quat_w[:, 0].clone()
-    root_lin_vel = self.body_lin_vel_w[:, 0].clone()
-    root_ang_vel = self.body_ang_vel_w[:, 0].clone()
+    root_pos = (
+      self.motion.root_pos_w[self.time_steps].clone()
+      + self._env.scene.env_origins
+    )
+    root_ori = self.motion.root_quat_w[self.time_steps].clone()
+    root_lin_vel = self.motion.root_lin_vel_w[self.time_steps].clone()
+    root_ang_vel = self.motion.root_ang_vel_w[self.time_steps].clone()
 
     range_list = [
       self.cfg.pose_range.get(key, (0.0, 0.0))
@@ -417,8 +427,14 @@ class MotionCommand(CommandTerm):
 
       for batch in env_indices:
         qpos = np.zeros(self._env.sim.mj_model.nq)
-        qpos[free_joint_q_adr[0:3]] = self.body_pos_w[batch, 0].cpu().numpy()
-        qpos[free_joint_q_adr[3:7]] = self.body_quat_w[batch, 0].cpu().numpy()
+        root_pos = (
+          self.motion.root_pos_w[self.time_steps[batch]].cpu().numpy()
+          + self._env.scene.env_origins[batch].cpu().numpy()
+        )
+        qpos[free_joint_q_adr[0:3]] = root_pos
+        qpos[free_joint_q_adr[3:7]] = (
+          self.motion.root_quat_w[self.time_steps[batch]].cpu().numpy()
+        )
         qpos[joint_q_adr] = self.joint_pos[batch].cpu().numpy()
 
         visualizer.add_ghost_mesh(qpos, model=self._ghost_model, label=f"ghost_{batch}")
