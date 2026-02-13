@@ -1,5 +1,8 @@
 """Tests specific to motion tracking tasks."""
 
+from pathlib import Path
+
+import numpy as np
 import pytest
 
 from mjlab.asset_zoo.robots import G1_ACTION_SCALE, MYOSKELETON_ACTION_SCALE
@@ -235,3 +238,116 @@ def test_myoskeleton_tracking_scene_builds() -> None:
   # Verify the model compiles and has actuators.
   model = scene.compile()
   assert model.nu > 0, "Compiled model has no actuators"
+
+
+# ── Motion data consistency test ──────────────────────────────────────────────
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]  # mjlab/
+_SIBLING = _REPO_ROOT.parent  # parent dir containing both mjlab/ and myosuite/
+H5_FILE = _SIBLING / "myosuite/myosuite/envs/myo/mjx/soccer1.h5"
+MODEL_XML = _SIBLING / "myosuite/myosuite/simhive/myo_model/myoskeleton/myoskeleton.xml"
+
+
+@pytest.mark.skipif(
+  not H5_FILE.exists() or not MODEL_XML.exists(),
+  reason="myosuite H5 motion or model XML not available",
+)
+def test_myoskeleton_npz_matches_h5_playback() -> None:
+  """Verify that soccer1.npz faithfully reproduces the original H5 motion.
+
+  Loads the H5, plays it through the MuJoCo model (same procedure as the
+  conversion script), and checks that body positions and joint positions
+  recorded in the NPZ match.
+  """
+  import h5py
+  import mujoco
+
+  # ── Load model ──────────────────────────────────────────────────────────
+  model = mujoco.MjModel.from_xml_path(str(MODEL_XML))
+  data = mujoco.MjData(model)
+
+  all_joint_names = [model.joint(i).name for i in range(model.njnt)]
+  FINGER_JOINTS = {
+    "cmc_flexion_r", "cmc_abduction_r", "mp_flexion_r", "ip_flexion_r",
+    "mcp2_flexion_r", "mcp2_abduction_r", "pm2_flexion_r", "md2_flexion_r",
+    "mcp3_flexion_r", "mcp3_abduction_r", "pm3_flexion_r", "md3_flexion_r",
+    "mcp4_flexion_r", "mcp4_abduction_r", "pm4_flexion_r", "md4_flexion_r",
+    "mcp5_flexion_r", "mcp5_abduction_r", "pm5_flexion_r", "md5_flexion_r",
+    "cmc_flexion_l", "cmc_abduction_l", "mp_flexion_l", "ip_flexion_l",
+    "mcp2_flexion_l", "mcp2_abduction_l", "pm2_flexion_l", "md2_flexion_l",
+    "mcp3_flexion_l", "mcp3_abduction_l", "pm3_flexion_l", "md3_flexion_l",
+    "mcp4_flexion_l", "mcp4_abduction_l", "pm4_flexion_l", "md4_flexion_l",
+    "mcp5_flexion_l", "mcp5_abduction_l", "pm5_flexion_l", "md5_flexion_l",
+  }
+  actuated_joints = [
+    n for n in all_joint_names
+    if n != "myoskeleton_root" and n not in FINGER_JOINTS
+  ]
+
+  # ── Load H5 ─────────────────────────────────────────────────────────────
+  with h5py.File(str(H5_FILE), "r") as f:
+    motion_name = list(f.keys())[0]
+    grp = f[motion_name]
+    time_arr = np.array(grp["time"], dtype=np.float64)
+    qpos_dict: dict[str, np.ndarray] = {}
+    for key in grp["qpos"]:
+      qpos_dict[key] = np.array(grp["qpos"][key], dtype=np.float64).squeeze()
+  horizon = len(time_arr)
+
+  # ── Load NPZ ────────────────────────────────────────────────────────────
+  cfg = load_env_cfg("Mjlab-Tracking-Flat-MyoSkeleton")
+  motion_cmd = cfg.commands["motion"]
+  assert isinstance(motion_cmd, MotionCommandCfg)
+  npz = np.load(motion_cmd.motion_file)
+  npz_joint_pos = npz["joint_pos"]
+  npz_body_pos = npz["body_pos_w"]
+  npz_body_quat = npz["body_quat_w"]
+
+  assert npz_joint_pos.shape[0] == horizon, (
+    f"NPZ timesteps ({npz_joint_pos.shape[0]}) != H5 timesteps ({horizon})"
+  )
+
+  # ── Play H5 through model and compare ──────────────────────────────────
+  h5_joints = [k for k in qpos_dict if k != "myoskeleton_root"]
+  valid_joints = [j for j in h5_joints if j in all_joint_names]
+
+  for t in range(horizon):
+    # Set root.
+    if "myoskeleton_root" in qpos_dict:
+      root_data = qpos_dict["myoskeleton_root"]
+      data.qpos[:7] = root_data if root_data.ndim == 1 else root_data[t]
+
+    # Set joints from H5.
+    for jn in valid_joints:
+      idx = all_joint_names.index(jn)
+      qadr = model.jnt_qposadr[idx]
+      val = qpos_dict[jn]
+      data.qpos[qadr] = val[t] if val.ndim > 0 and val.shape[0] == horizon else val
+
+    mujoco.mj_forward(model, data)
+
+    # Compare body positions.
+    np.testing.assert_allclose(
+      data.xpos, npz_body_pos[t], atol=1e-4,
+      err_msg=f"body_pos_w mismatch at t={t}",
+    )
+
+    # Compare body quaternions (allow sign flip).
+    for b in range(model.nbody):
+      q_sim = data.xquat[b]
+      q_npz = npz_body_quat[t, b]
+      dot = np.abs(np.dot(q_sim, q_npz))
+      assert dot > 0.999, (
+        f"body_quat_w mismatch at t={t}, body {model.body(b).name}: "
+        f"dot={dot:.6f}"
+      )
+
+    # Compare actuated joint positions.
+    for j_idx, jn in enumerate(actuated_joints):
+      if jn in all_joint_names:
+        model_idx = all_joint_names.index(jn)
+        qadr = model.jnt_qposadr[model_idx]
+        np.testing.assert_allclose(
+          data.qpos[qadr], npz_joint_pos[t, j_idx], atol=1e-5,
+          err_msg=f"joint_pos mismatch at t={t}, joint {jn}",
+        )

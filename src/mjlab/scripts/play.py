@@ -23,7 +23,7 @@ from mjlab.viewer import NativeMujocoViewer, ViserPlayViewer
 
 @dataclass(frozen=True)
 class PlayConfig:
-  agent: Literal["zero", "random", "trained"] = "trained"
+  agent: Literal["zero", "random", "motion", "trained"] = "trained"
   registry_name: str | None = None
   wandb_run_path: str | None = None
   checkpoint_file: str | None = None
@@ -51,11 +51,14 @@ def run_play(task_id: str, cfg: PlayConfig):
   env_cfg = load_env_cfg(task_id, play=True)
   agent_cfg = load_rl_cfg(task_id)
 
-  DUMMY_MODE = cfg.agent in {"zero", "random"}
+  DUMMY_MODE = cfg.agent in {"zero", "random", "motion"}
   TRAINED_MODE = not DUMMY_MODE
 
+  MOTION_MODE = cfg.agent == "motion"
+
   # Disable terminations if requested (useful for viewing motions).
-  if cfg.no_terminations:
+  # Motion playback always disables terminations.
+  if cfg.no_terminations or MOTION_MODE:
     env_cfg.terminations = {}
     print("[INFO]: Terminations disabled")
 
@@ -175,7 +178,7 @@ def run_play(task_id: str, cfg: PlayConfig):
   env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
   if DUMMY_MODE:
     action_shape: tuple[int, ...] = env.unwrapped.action_space.shape
-    if cfg.agent == "zero":
+    if cfg.agent == "zero" or MOTION_MODE:
 
       class PolicyZero:
         def __call__(self, obs) -> torch.Tensor:
@@ -208,11 +211,42 @@ def run_play(task_id: str, cfg: PlayConfig):
     resolved_viewer = cfg.viewer
 
   if resolved_viewer == "native":
-    NativeMujocoViewer(env, policy).run()
+    viewer = NativeMujocoViewer(env, policy)
   elif resolved_viewer == "viser":
-    ViserPlayViewer(env, policy).run()
+    viewer = ViserPlayViewer(env, policy)
   else:
     raise RuntimeError(f"Unsupported viewer backend: {resolved_viewer}")
+
+  # In motion mode, override the viewer's step to write the reference motion
+  # directly into the sim after each env.step (which advances the motion
+  # command time).  This lets the viewer render the original motion clip.
+  if MOTION_MODE and is_tracking_task:
+    from mjlab.tasks.tracking.mdp.commands import MotionCommand
+
+    _base_step = viewer.step_simulation
+    _raw_env: ManagerBasedRlEnv = env.unwrapped
+    _motion: MotionCommand = _raw_env.command_manager.get_term("motion")
+
+    def _motion_step() -> None:
+      _base_step()
+      t = _motion.time_steps
+      root_state = torch.cat(
+        [
+          _motion.motion.root_pos_w[t] + _raw_env.scene.env_origins,
+          _motion.motion.root_quat_w[t],
+          _motion.motion.root_lin_vel_w[t],
+          _motion.motion.root_ang_vel_w[t],
+        ],
+        dim=-1,
+      )
+      _motion.robot.write_root_state_to_sim(root_state)
+      _motion.robot.write_joint_state_to_sim(_motion.joint_pos, _motion.joint_vel)
+      _raw_env.sim.forward()
+
+    viewer.step_simulation = _motion_step  # type: ignore[assignment]
+    print("[INFO]: Motion playback mode — rendering reference motion")
+
+  viewer.run()
 
   env.close()
 
