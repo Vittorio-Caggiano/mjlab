@@ -8,6 +8,11 @@ This tutorial shows how to create your own tracking task based on
 You only install ``mjlab`` from PyPI, then define and register a custom task in
 your own repository.
 
+It includes two styles:
+
+1. **Single-file script** (everything in ``train_custom_myo.py``).
+2. **Notebook-style workflow** (cells you can paste into Jupyter).
+
 Prerequisites
 -------------
 
@@ -25,89 +30,66 @@ Example install:
    pip install git+https://github.com/google-deepmind/mujoco_warp@7c20a44bfed722e6415235792a1b247ea6b6a6d3
    pip install mjlab
 
-Step 1) Create a project for your custom task
-----------------------------------------------
+Option A) Keep everything in ``train_custom_myo.py``
+----------------------------------------------------
 
-.. code-block:: bash
+Yes — you can keep task registration + training launch in one file.
+This is the simplest format for quick experiments.
 
-   mkdir my_myo_tracking
-   cd my_myo_tracking
-   mkdir -p my_myo_tracking
-   touch my_myo_tracking/__init__.py
-
-Step 2) Register a custom task in your package
------------------------------------------------
-
-Create ``my_myo_tracking/tasks.py``:
+Create ``train_custom_myo.py``:
 
 .. code-block:: python
 
    from mjlab.tasks.registry import register_mjlab_task
    from mjlab.tasks.tracking.rl import MotionTrackingOnPolicyRunner
-
    from mjlab.tasks.tracking.config.myoskeleton.env_cfgs import (
      myoskeleton_flat_tracking_env_cfg,
    )
    from mjlab.tasks.tracking.config.myoskeleton.rl_cfg import (
      myoskeleton_tracking_ppo_runner_cfg,
    )
-
-
-   register_mjlab_task(
-     task_id="Mjlab-Tracking-Flat-MyoSkeleton-Custom",
-     env_cfg=myoskeleton_flat_tracking_env_cfg(),
-     play_env_cfg=myoskeleton_flat_tracking_env_cfg(play=True),
-     rl_cfg=myoskeleton_tracking_ppo_runner_cfg(),
-     runner_cls=MotionTrackingOnPolicyRunner,
-   )
-
-This creates a new task ID in your own codebase. From here you can customize:
-
-- environment randomization,
-- reward/termination configuration,
-- PPO hyperparameters.
-
-Step 3) Add a tiny training launcher
-------------------------------------
-
-Create ``train_custom_myo.py`` at project root:
-
-.. code-block:: python
-
-   import my_myo_tracking.tasks  # noqa: F401 (registers custom task)
-
    from mjlab.scripts.train import TrainConfig, launch_training
 
 
-   if __name__ == "__main__":
-     task_id = "Mjlab-Tracking-Flat-MyoSkeleton-Custom"
-     cfg = TrainConfig.from_task(task_id)
+   CUSTOM_TASK_ID = "Mjlab-Tracking-Flat-MyoSkeleton-Custom"
 
-     # Optional: task-specific overrides.
+
+   def register_task() -> None:
+     register_mjlab_task(
+       task_id=CUSTOM_TASK_ID,
+       env_cfg=myoskeleton_flat_tracking_env_cfg(),
+       play_env_cfg=myoskeleton_flat_tracking_env_cfg(play=True),
+       rl_cfg=myoskeleton_tracking_ppo_runner_cfg(),
+       runner_cls=MotionTrackingOnPolicyRunner,
+     )
+
+
+   if __name__ == "__main__":
+     register_task()
+
+     cfg = TrainConfig.from_task(CUSTOM_TASK_ID)
+
+     # Optional: task-specific defaults.
      cfg.agent.experiment_name = "myoskeleton_tracking_custom"
      cfg.agent.run_name = "baseline"
      cfg.agent.max_iterations = 2000
      cfg.agent.logger = "tensorboard"
 
-     # You can also tune env and PPO settings here.
+     # Optional tuning examples.
      # cfg.env.scene.num_envs = 2048
      # cfg.agent.num_steps_per_env = 16
      # cfg.agent.actor.init_noise_std = 0.6
 
-     launch_training(task_id, cfg)
+     launch_training(CUSTOM_TASK_ID, cfg)
 
-Step 4) Run training with a motion file
----------------------------------------
-
-Tracking tasks need a motion reference file.
-Pass a local ``motion.npz`` with a CLI override:
+Run it with a motion file override:
 
 .. code-block:: bash
 
    python train_custom_myo.py \
      --env.commands.motion.motion-file /absolute/path/to/motion.npz
 
-You can also pass other overrides the same way, for example:
+You can pass more overrides as usual:
 
 .. code-block:: bash
 
@@ -117,18 +99,81 @@ You can also pass other overrides the same way, for example:
      --agent.algorithm.learning-rate 5e-4 \
      --agent.actor.init-noise-std 0.6
 
-Step 5) (Optional) Use the training sequence benchmark script
--------------------------------------------------------------
+Option B) Notebook-style workflow (Jupyter)
+--------------------------------------------
 
-If you want to run a multi-case sequence with min-iteration tracking:
+If you prefer a notebook tutorial style, use cells like this.
+
+Cell 1: Imports
+^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+   from mjlab.tasks.registry import register_mjlab_task
+   from mjlab.tasks.tracking.rl import MotionTrackingOnPolicyRunner
+   from mjlab.tasks.tracking.config.myoskeleton.env_cfgs import (
+     myoskeleton_flat_tracking_env_cfg,
+   )
+   from mjlab.tasks.tracking.config.myoskeleton.rl_cfg import (
+     myoskeleton_tracking_ppo_runner_cfg,
+   )
+   from mjlab.scripts.train import TrainConfig, launch_training
+
+Cell 2: Register custom task
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+   CUSTOM_TASK_ID = "Mjlab-Tracking-Flat-MyoSkeleton-Custom"
+
+   register_mjlab_task(
+     task_id=CUSTOM_TASK_ID,
+     env_cfg=myoskeleton_flat_tracking_env_cfg(),
+     play_env_cfg=myoskeleton_flat_tracking_env_cfg(play=True),
+     rl_cfg=myoskeleton_tracking_ppo_runner_cfg(),
+     runner_cls=MotionTrackingOnPolicyRunner,
+   )
+
+Cell 3: Configure training
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+   cfg = TrainConfig.from_task(CUSTOM_TASK_ID)
+   cfg.agent.experiment_name = "myoskeleton_tracking_custom"
+   cfg.agent.run_name = "notebook_baseline"
+   cfg.agent.max_iterations = 2000
+   cfg.agent.logger = "tensorboard"
+
+Cell 4: Launch training
+^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+   launch_training(
+     CUSTOM_TASK_ID,
+     cfg,
+   )
+
+Then run from terminal (recommended) to pass the motion file override:
 
 .. code-block:: bash
 
-   python -m mjlab.scripts.train Mjlab-Tracking-Flat-MyoSkeleton \
+   python train_custom_myo.py \
      --env.commands.motion.motion-file /absolute/path/to/motion.npz
 
-Or use your local copy of ``run_myoskeleton_training_sequence.py`` and point it
-at your motion file.
+If you do launch directly inside the notebook process, make sure your motion
+file is set before training starts (tracking tasks require it).
+
+When to split into multiple files
+---------------------------------
+
+Single-file is ideal for fast iteration.
+Split into ``my_myo_tracking/tasks.py`` + a launcher later if you want:
+
+- cleaner package structure,
+- reusable task registrations,
+- easier testing/versioning in larger projects.
 
 Notes
 -----
