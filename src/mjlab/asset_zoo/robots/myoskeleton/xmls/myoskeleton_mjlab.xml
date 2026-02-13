@@ -1,0 +1,13 @@
+<!-- MyoSkeleton for mjlab (scene handled by framework). -->
+<mujoco model="MyoSkeleton">
+
+	<include file="./assets/myoskeleton_assets.xml"/>
+
+	<worldbody>
+		<body name="myoskeleton_root" pos="0 0 .95">
+			<freejoint name="myoskeleton_root"/>
+			<include file="./assets/myoskeleton_chain.xml"/>
+		</body>
+	</worldbody>
+
+</mujoco>

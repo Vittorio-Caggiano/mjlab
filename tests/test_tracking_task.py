@@ -2,7 +2,7 @@
 
 import pytest
 
-from mjlab.asset_zoo.robots import G1_ACTION_SCALE
+from mjlab.asset_zoo.robots import G1_ACTION_SCALE, MYOSKELETON_ACTION_SCALE
 from mjlab.envs.mdp.actions import JointPositionActionCfg
 from mjlab.tasks.registry import list_tasks, load_env_cfg
 from mjlab.tasks.tracking.mdp import MotionCommandCfg
@@ -77,6 +77,7 @@ def test_tracking_play_disables_rsi_randomization() -> None:
   tracking_tasks = [
     "Mjlab-Tracking-Flat-Unitree-G1",
     "Mjlab-Tracking-Flat-Unitree-G1-No-State-Estimation",
+    "Mjlab-Tracking-Flat-MyoSkeleton",
   ]
 
   for task_id in tracking_tasks:
@@ -102,6 +103,7 @@ def test_tracking_play_uses_start_sampling_mode() -> None:
   tracking_tasks = [
     "Mjlab-Tracking-Flat-Unitree-G1",
     "Mjlab-Tracking-Flat-Unitree-G1-No-State-Estimation",
+    "Mjlab-Tracking-Flat-MyoSkeleton",
   ]
 
   for task_id in tracking_tasks:
@@ -132,3 +134,79 @@ def test_g1_tracking_has_correct_action_scale(g1_tracking_task_ids: list[str]) -
     assert joint_pos_action.scale == G1_ACTION_SCALE, (
       f"Task {task_id} action scale mismatch, expected G1_ACTION_SCALE"
     )
+
+
+# ── MyoSkeleton-specific tests ──────────────────────────────────────────────
+
+
+@pytest.fixture(scope="module")
+def myoskeleton_tracking_task_ids(tracking_task_ids: list[str]) -> list[str]:
+  """Get all MyoSkeleton tracking task IDs."""
+  return [t for t in tracking_task_ids if "MyoSkeleton" in t]
+
+
+def test_myoskeleton_tracking_has_correct_action_scale(
+  myoskeleton_tracking_task_ids: list[str],
+) -> None:
+  """MyoSkeleton tracking tasks should use MYOSKELETON_ACTION_SCALE."""
+  for task_id in myoskeleton_tracking_task_ids:
+    cfg = load_env_cfg(task_id)
+
+    assert "joint_pos" in cfg.actions, f"Task {task_id} missing 'joint_pos' action"
+
+    joint_pos_action = cfg.actions["joint_pos"]
+    assert isinstance(joint_pos_action, JointPositionActionCfg), (
+      f"Task {task_id} joint_pos action is not JointPositionActionCfg"
+    )
+
+    assert joint_pos_action.scale == MYOSKELETON_ACTION_SCALE, (
+      f"Task {task_id} action scale mismatch, expected MYOSKELETON_ACTION_SCALE"
+    )
+
+
+def test_myoskeleton_tracking_has_correct_motion_file(
+  myoskeleton_tracking_task_ids: list[str],
+) -> None:
+  """MyoSkeleton tracking tasks should reference the soccer1.npz motion file."""
+  for task_id in myoskeleton_tracking_task_ids:
+    cfg = load_env_cfg(task_id)
+
+    motion_cmd = cfg.commands["motion"]
+    assert isinstance(motion_cmd, MotionCommandCfg)
+    assert "soccer1.npz" in motion_cmd.motion_file, (
+      f"Task {task_id} motion_file={motion_cmd.motion_file}, expected soccer1.npz"
+    )
+
+
+def test_myoskeleton_tracking_has_correct_anchor_body(
+  myoskeleton_tracking_task_ids: list[str],
+) -> None:
+  """MyoSkeleton tracking tasks should use pelvis as anchor body."""
+  for task_id in myoskeleton_tracking_task_ids:
+    cfg = load_env_cfg(task_id)
+
+    motion_cmd = cfg.commands["motion"]
+    assert isinstance(motion_cmd, MotionCommandCfg)
+    assert motion_cmd.anchor_body_name == "pelvis", (
+      f"Task {task_id} anchor_body_name={motion_cmd.anchor_body_name}, expected 'pelvis'"
+    )
+
+
+def test_myoskeleton_tracking_has_15_tracking_bodies(
+  myoskeleton_tracking_task_ids: list[str],
+) -> None:
+  """MyoSkeleton tracking tasks should track 15 bodies."""
+  for task_id in myoskeleton_tracking_task_ids:
+    cfg = load_env_cfg(task_id)
+
+    motion_cmd = cfg.commands["motion"]
+    assert isinstance(motion_cmd, MotionCommandCfg)
+    assert len(motion_cmd.body_names) == 15, (
+      f"Task {task_id} has {len(motion_cmd.body_names)} tracking bodies, expected 15"
+    )
+
+
+def test_myoskeleton_task_is_registered() -> None:
+  """The MyoSkeleton tracking task should be in the registry."""
+  tasks = list_tasks()
+  assert "Mjlab-Tracking-Flat-MyoSkeleton" in tasks
