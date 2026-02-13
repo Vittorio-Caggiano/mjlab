@@ -99,6 +99,8 @@ def run_play(task_id: str, cfg: PlayConfig):
       if cfg.motion_file is not None:
         print(f"[INFO]: Using motion file from CLI: {cfg.motion_file}")
         motion_cmd.motion_file = cfg.motion_file
+      elif motion_cmd.motion_file and Path(motion_cmd.motion_file).exists():
+        print(f"[INFO]: Using bundled motion file: {motion_cmd.motion_file}")
       else:
         import wandb
 
