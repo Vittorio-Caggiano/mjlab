@@ -121,7 +121,7 @@ MYOSKELETON_ACTUATOR_SPINE_FLEX_BEND = BuiltinPositionActuatorCfg(
 
 MYOSKELETON_ACTUATOR_SPINE_ROTATION = BuiltinPositionActuatorCfg(
     target_names_expr=(
-        "lumbar_rotation",
+        "L5_S1_axial_rotation",
         "L4_L5_axial_rotation",
         "L3_L4_axial_rotation",
         "L2_L3_axial_rotation",
@@ -140,14 +140,8 @@ _S_ARM, _D_ARM, _E_ARM, _A_ARM = _actuator_params(250)
 
 MYOSKELETON_ACTUATOR_ARM = BuiltinPositionActuatorCfg(
     target_names_expr=(
-        "arm_flex_r",
-        "arm_add_r",
-        "arm_rot_r",
         "elbow_flex_r",
-        "pro_sup_r",
-        "arm_flex_l",
-        "arm_add_l",
-        "arm_rot_l",
+        "pro_sup",
         "elbow_flex_l",
         "pro_sup_l",
     ),
@@ -161,10 +155,10 @@ _S_WRIST, _D_WRIST, _E_WRIST, _A_WRIST = _actuator_params(50)
 
 MYOSKELETON_ACTUATOR_WRIST = BuiltinPositionActuatorCfg(
     target_names_expr=(
-        "wrist_flex_r",
-        "wrist_dev_r",
-        "wrist_flex_l",
-        "wrist_dev_l",
+        "flexion_r",
+        "deviation",
+        "flexion_l",
+        "deviation_l",
     ),
     stiffness=_S_WRIST,
     damping=_D_WRIST,

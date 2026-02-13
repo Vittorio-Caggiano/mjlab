@@ -72,6 +72,23 @@ uv run train Mjlab-Tracking-Flat-Unitree-G1 --registry-name your-org/motions/mot
 uv run play Mjlab-Tracking-Flat-Unitree-G1 --wandb-run-path your-org/mjlab/run-id
 ```
 
+#### MyoSkeleton Motion Tracking
+
+Train the [MyoSkeleton](https://github.com/MyoHub/myosuite) musculoskeletal model to imitate reference motions (e.g. soccer kicks from `soccer1.npz`):
+
+```bash
+# Single GPU
+uv run train Mjlab-Tracking-Flat-MyoSkeleton --env.scene.num-envs 4096
+
+# Multi-GPU
+uv run train Mjlab-Tracking-Flat-MyoSkeleton --gpu-ids 0 1 --env.scene.num-envs 4096
+
+# Evaluate a trained policy
+uv run play Mjlab-Tracking-Flat-MyoSkeleton --wandb-run-path your-org/mjlab/run-id
+```
+
+The MyoSkeleton task uses a bundled motion file (`soccer1.npz`), so no `--registry-name` is needed. To convert additional `.h5` motions from myosuite, see `convert_h5_to_npz.py` in the [myosuite repo](https://github.com/MyoHub/myosuite/tree/torque).
+
 ### 3. Sanity-check with Dummy Agents
 
 Use built-in agents to sanity check your MDP before training:
