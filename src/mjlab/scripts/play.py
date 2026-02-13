@@ -79,21 +79,22 @@ def run_play(task_id: str, cfg: PlayConfig):
       print(f"[INFO]: Using local motion file: {cfg.motion_file}")
       motion_cmd.motion_file = cfg.motion_file
     elif DUMMY_MODE:
-      if not cfg.registry_name:
+      if not cfg.registry_name and not motion_cmd.motion_file:
         raise ValueError(
           "Tracking tasks require either:\n"
           "  --motion-file /path/to/motion.npz (local file)\n"
           "  --registry-name your-org/motions/motion-name (download from WandB)"
         )
-      # Check if the registry name includes alias, if not, append ":latest".
-      registry_name = cfg.registry_name
-      if ":" not in registry_name:
-        registry_name = registry_name + ":latest"
-      import wandb
+      if cfg.registry_name:
+        # Check if the registry name includes alias, if not, append ":latest".
+        registry_name = cfg.registry_name
+        if ":" not in registry_name:
+          registry_name = registry_name + ":latest"
+        import wandb
 
-      api = wandb.Api()
-      artifact = api.artifact(registry_name)
-      motion_cmd.motion_file = str(Path(artifact.download()) / "motion.npz")
+        api = wandb.Api()
+        artifact = api.artifact(registry_name)
+        motion_cmd.motion_file = str(Path(artifact.download()) / "motion.npz")
     else:
       if cfg.motion_file is not None:
         print(f"[INFO]: Using motion file from CLI: {cfg.motion_file}")
