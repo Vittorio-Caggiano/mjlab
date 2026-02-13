@@ -210,3 +210,28 @@ def test_myoskeleton_task_is_registered() -> None:
   """The MyoSkeleton tracking task should be in the registry."""
   tasks = list_tasks()
   assert "Mjlab-Tracking-Flat-MyoSkeleton" in tasks
+
+
+def test_myoskeleton_tracking_scene_builds() -> None:
+  """The MyoSkeleton scene builds with all required sensors and actuators."""
+  from mjlab.scene import Scene
+
+  cfg = load_env_cfg("Mjlab-Tracking-Flat-MyoSkeleton")
+  cfg.scene.num_envs = 1
+
+  scene = Scene(cfg.scene, device="cpu")
+
+  # The base tracking config requires these IMU sensors.
+  # Scene.__getitem__ raises KeyError if not found.
+  try:
+    scene["robot/imu_lin_vel"]
+  except KeyError:
+    pytest.fail("Scene missing 'robot/imu_lin_vel' sensor")
+  try:
+    scene["robot/imu_ang_vel"]
+  except KeyError:
+    pytest.fail("Scene missing 'robot/imu_ang_vel' sensor")
+
+  # Verify the model compiles and has actuators.
+  model = scene.compile()
+  assert model.nu > 0, "Compiled model has no actuators"

@@ -10,6 +10,7 @@
         <geom name="pelvis_r_coll" type="ellipsoid" size=".110 .13 0.11" class="myo_coll" pos="-.08 -.03 0.07" euler="0.2 0 0" mass="2"/>
         <geom name="pelvis_l_coll" type="ellipsoid" size=".110 .13 0.11" class="myo_coll" pos="-.08 -.03 -.07" euler="-.2 0 0" mass="2"/>
         <geom name="sacrum1"  size="0 0 0" pos="0.01 -0.017 0" quat="1 0 0 0" mesh="sacrum" class="bone"/>
+        <site name="imu_in_pelvis" size="0.01"/>
         <camera name="side_l" mode="trackcom" pos="0 0.5 3" euler="-0.1 0 0"/>
         <camera name="side_r" mode="trackcom" pos="0 0.5 -3" euler="0.1 -3.14 0"/>
         <!-- Lumbar -> Upper Torso -->

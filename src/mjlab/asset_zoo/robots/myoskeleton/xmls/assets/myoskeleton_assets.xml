@@ -175,6 +175,8 @@
     </contact>
 
     <sensor>
+        <gyro name="imu_ang_vel" site="imu_in_pelvis"/>
+        <velocimeter name="imu_lin_vel" site="imu_in_pelvis"/>
         <accelerometer name="wrist_r_acc" site="s_wrist_r"/>
         <accelerometer name="wrist_l_acc" site="s_wrist_l"/>
         <accelerometer name="head_acc" site="s_head"/>
