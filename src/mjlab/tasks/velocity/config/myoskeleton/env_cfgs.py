@@ -1,5 +1,8 @@
 """MyoSkeleton velocity environment configurations."""
 
+import copy
+import math
+
 from mjlab.asset_zoo.robots import (
   MYOSKELETON_ACTION_SCALE,
   get_myoskeleton_robot_cfg,
@@ -160,5 +163,74 @@ def myoskeleton_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
       del cfg.curriculum["command_vel"]
     twist_cmd.ranges.lin_vel_x = (-0.5, 1.0)
     twist_cmd.ranges.ang_vel_z = (-0.5, 0.5)
+
+  return cfg
+
+
+def myoskeleton_standing_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
+  """Create MyoSkeleton standing-only configuration.
+
+  Derived from the velocity config with key differences:
+  - All envs receive zero velocity commands (standing only).
+  - Locomotion-specific rewards (foot clearance, swing height, air time)
+    are disabled.
+  - Tighter default-pose tolerance and higher upright/alive weights.
+  - No push perturbations initially (added via curriculum / sweep).
+  - No velocity curriculum.
+  """
+  cfg = myoskeleton_flat_env_cfg(play=play)
+
+  # ── Command: 100% standing envs ──────────────────────────────────────────
+  twist_cmd = cfg.commands["twist"]
+  assert isinstance(twist_cmd, UniformVelocityCommandCfg)
+  twist_cmd.rel_standing_envs = 1.0  # All envs get zero velocity.
+  twist_cmd.ranges.lin_vel_x = (0.0, 0.0)
+  twist_cmd.ranges.lin_vel_y = (0.0, 0.0)
+  twist_cmd.ranges.ang_vel_z = (0.0, 0.0)
+
+  # ── Rewards: standing-focused ────────────────────────────────────────────
+  # Core standing rewards — increase weights for static balance.
+  cfg.rewards["alive"].weight = 15.0
+  cfg.rewards["upright"].weight = 8.0
+
+  # Default pose is critical for standing — tighten tolerance.
+  cfg.rewards["pose"].weight = 8.0
+  cfg.rewards["pose"].params["std_standing"] = {".*": 0.03}  # Tighter.
+
+  # Velocity tracking still works (target=0, so reward stillness).
+  cfg.rewards["track_linear_velocity"].weight = 5.0
+  cfg.rewards["track_linear_velocity"].params["std"] = 0.3  # Tighter kernel.
+  cfg.rewards["track_angular_velocity"].weight = 3.0
+  cfg.rewards["track_angular_velocity"].params["std"] = 0.3
+
+  # Disable locomotion-specific rewards (meaningless for standing).
+  cfg.rewards["foot_clearance"].weight = 0.0
+  cfg.rewards["foot_swing_height"].weight = 0.0
+  cfg.rewards["foot_slip"].weight = 0.0
+  cfg.rewards["air_time"].weight = 0.0
+  cfg.rewards["soft_landing"].weight = 0.0
+
+  # Penalize unnecessary movement more.
+  cfg.rewards["action_rate_l2"].weight = -0.05
+  cfg.rewards["body_ang_vel"].weight = -0.1
+
+  # Penalize joint velocity to discourage oscillation.
+  cfg.rewards["joint_vel"] = RewardTermCfg(
+    func=envs_mdp.joint_vel_l2, weight=-0.005
+  )
+
+  # ── Events: easier initial conditions ────────────────────────────────────
+  # No push perturbations initially — robot learns to stand first.
+  cfg.events.pop("push_robot", None)
+
+  # Minimal joint randomization at reset.
+  cfg.events["reset_robot_joints"].params["position_range"] = (-0.02, 0.02)
+
+  # ── Curriculum: none needed ──────────────────────────────────────────────
+  if "command_vel" in cfg.curriculum:
+    del cfg.curriculum["command_vel"]
+
+  # ── Termination: tighter limits for standing ─────────────────────────────
+  cfg.terminations["fell_over"].params["limit_angle"] = math.radians(45.0)
 
   return cfg

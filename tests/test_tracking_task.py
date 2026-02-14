@@ -354,3 +354,73 @@ def test_myoskeleton_npz_matches_h5_playback() -> None:
           data.qpos[qadr], npz_joint_pos[t, j_idx], atol=1e-5,
           err_msg=f"joint_pos mismatch at t={t}, joint {jn}",
         )
+
+
+# ── Standing task tests ──────────────────────────────────────────────────────
+
+
+def test_standing_task_is_registered() -> None:
+  """The MyoSkeleton standing task should be in the registry."""
+  tasks = list_tasks()
+  assert "Mjlab-Standing-Flat-MyoSkeleton" in tasks
+
+
+def test_standing_task_commands_are_zero() -> None:
+  """Standing task should issue zero velocity commands."""
+  from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
+
+  cfg = load_env_cfg("Mjlab-Standing-Flat-MyoSkeleton")
+
+  twist_cmd = cfg.commands["twist"]
+  assert isinstance(twist_cmd, UniformVelocityCommandCfg)
+  assert twist_cmd.rel_standing_envs == 1.0, (
+    f"Standing task rel_standing_envs={twist_cmd.rel_standing_envs}, expected 1.0"
+  )
+  assert twist_cmd.ranges.lin_vel_x == (0.0, 0.0)
+  assert twist_cmd.ranges.lin_vel_y == (0.0, 0.0)
+  assert twist_cmd.ranges.ang_vel_z == (0.0, 0.0)
+
+
+def test_standing_task_disables_locomotion_rewards() -> None:
+  """Standing task should disable foot clearance, swing height, air time, etc."""
+  cfg = load_env_cfg("Mjlab-Standing-Flat-MyoSkeleton")
+
+  for reward_name in ["foot_clearance", "foot_swing_height", "foot_slip", "air_time", "soft_landing"]:
+    assert cfg.rewards[reward_name].weight == 0.0, (
+      f"Standing task reward '{reward_name}' weight={cfg.rewards[reward_name].weight}, expected 0.0"
+    )
+
+
+def test_standing_task_has_no_push_perturbation() -> None:
+  """Standing task should not push the robot during training."""
+  cfg = load_env_cfg("Mjlab-Standing-Flat-MyoSkeleton")
+  assert "push_robot" not in cfg.events, (
+    "Standing task should not have push_robot event"
+  )
+
+
+def test_standing_task_has_alive_and_upright_rewards() -> None:
+  """Standing task must have alive and upright rewards with high weights."""
+  cfg = load_env_cfg("Mjlab-Standing-Flat-MyoSkeleton")
+
+  assert "alive" in cfg.rewards
+  assert cfg.rewards["alive"].weight >= 10.0, (
+    f"alive weight={cfg.rewards['alive'].weight}, expected >= 10.0"
+  )
+
+  assert "upright" in cfg.rewards
+  assert cfg.rewards["upright"].weight >= 5.0, (
+    f"upright weight={cfg.rewards['upright'].weight}, expected >= 5.0"
+  )
+
+
+def test_standing_task_scene_builds() -> None:
+  """The MyoSkeleton standing scene builds with all required sensors."""
+  from mjlab.scene import Scene
+
+  cfg = load_env_cfg("Mjlab-Standing-Flat-MyoSkeleton")
+  cfg.scene.num_envs = 1
+
+  scene = Scene(cfg.scene, device="cpu")
+  model = scene.compile()
+  assert model.nu > 0, "Compiled model has no actuators"
