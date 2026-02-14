@@ -9,5 +9,8 @@
 			<include file="./assets/myoskeleton_chain.xml"/>
 		</body>
 	</worldbody>
+	<sensor>
+		<subtreeangmom name="root_angmom" body="myoskeleton_root"/>
+	</sensor>
 
 </mujoco>

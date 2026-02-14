@@ -310,9 +310,13 @@ class variable_posture:
     assert default_joint_pos is not None
     self.default_joint_pos = default_joint_pos
 
+    # We resolve the joint IDs and names that we will actually reward.
+    # We use std_walking as the reference for which joints to include.
+    # All three dicts (standing, walking, running) MUST match the same set of joints
+    # to maintain consistent tensor shapes.
     _, joint_names = asset.find_joints(cfg.params["asset_cfg"].joint_names)
 
-    _, _, std_standing = resolve_matching_names_values(
+    self.joint_ids, matched_names, std_standing = resolve_matching_names_values(
       data=cfg.params["std_standing"],
       list_of_strings=joint_names,
     )
@@ -320,17 +324,34 @@ class variable_posture:
       std_standing, device=env.device, dtype=torch.float32
     )
 
-    _, _, std_walking = resolve_matching_names_values(
+    ids_w, names_w, std_walking = resolve_matching_names_values(
       data=cfg.params["std_walking"],
       list_of_strings=joint_names,
     )
+    if ids_w != self.joint_ids:
+      raise ValueError(
+        f"variable_posture: std_walking matches different joints ({names_w}) "
+        f"than std_standing ({matched_names}). They must match the same set."
+      )
     self.std_walking = torch.tensor(std_walking, device=env.device, dtype=torch.float32)
 
-    _, _, std_running = resolve_matching_names_values(
+    ids_r, names_r, std_running = resolve_matching_names_values(
       data=cfg.params["std_running"],
       list_of_strings=joint_names,
     )
+    if ids_r != self.joint_ids:
+      raise ValueError(
+        f"variable_posture: std_running matches different joints ({names_r}) "
+        f"than std_standing ({matched_names}). They must match the same set."
+      )
     self.std_running = torch.tensor(std_running, device=env.device, dtype=torch.float32)
+
+    # Map the local indices back to the entity's joint IDs.
+    # asset.find_joints returns indices into the provided subset (or self.joint_names).
+    # If cfg.params["asset_cfg"].joint_names was a subset, we need to map back.
+    # But usually it's ".*" or similar.
+    all_joint_ids, _ = asset.find_joints(cfg.params["asset_cfg"].joint_names)
+    self.resolved_joint_ids = [all_joint_ids[i] for i in self.joint_ids]
 
   def __call__(
     self,
@@ -365,8 +386,9 @@ class variable_posture:
       + self.std_running * running_mask.unsqueeze(1)
     )
 
-    current_joint_pos = asset.data.joint_pos[:, asset_cfg.joint_ids]
-    desired_joint_pos = self.default_joint_pos[:, asset_cfg.joint_ids]
+    # Use the resolved joint IDs that match our std tensors.
+    current_joint_pos = asset.data.joint_pos[:, self.resolved_joint_ids]
+    desired_joint_pos = self.default_joint_pos[:, self.resolved_joint_ids]
     error_squared = torch.square(current_joint_pos - desired_joint_pos)
 
     return torch.exp(-torch.mean(error_squared / (std**2), dim=1))
