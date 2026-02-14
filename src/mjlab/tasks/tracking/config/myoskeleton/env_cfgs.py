@@ -44,7 +44,7 @@ def myoskeleton_flat_tracking_env_cfg(
   assert isinstance(motion_cmd, MotionCommandCfg)
   motion_cmd.anchor_body_name = "pelvis"
   motion_cmd.body_names = MYOSKELETON_TRACKING_BODIES
-  motion_cmd.motion_file = str(MYOSKELETON_MOTION_DIR / "soccer1.npz")
+  motion_cmd.motion_file = str(MYOSKELETON_MOTION_DIR / "standing_motion.npz")
 
   # Domain randomization: foot friction geoms and base COM body.
   # The myoskeleton uses capsule collision geoms (class myo_coll).

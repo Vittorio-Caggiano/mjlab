@@ -74,7 +74,7 @@ uv run play Mjlab-Tracking-Flat-Unitree-G1 --wandb-run-path your-org/mjlab/run-i
 
 ### MyoSkeleton Motion Tracking
 
-Train the [MyoSkeleton](https://github.com/MyoHub/myosuite) musculoskeletal model to imitate reference motions (e.g. soccer kicks from `soccer1.npz`):
+Train the [MyoSkeleton](https://github.com/MyoHub/myosuite) musculoskeletal model to imitate reference motions (default: `standing_motion.npz`):
 
 ```bash
 # Single GPU
@@ -87,7 +87,24 @@ uv run train Mjlab-Tracking-Flat-MyoSkeleton --gpu-ids 0 1 --env.scene.num-envs 
 uv run play Mjlab-Tracking-Flat-MyoSkeleton --wandb-run-path your-org/mjlab/run-id
 ```
 
-The MyoSkeleton task uses a bundled motion file (`soccer1.npz`), so no `--registry-name` is needed. To convert additional `.h5` motions from myosuite, see `convert_h5_to_npz.py` in the [myosuite repo](https://github.com/MyoHub/myosuite/tree/torque).
+The MyoSkeleton task uses a bundled motion file (`standing_motion.npz`), so no `--registry-name` is needed.
+
+#### Switching or adding motions
+
+To use a different motion (e.g. `soccer1.h5`) or add new ones:
+
+1. **Convert** the H5 to NPZ using the conversion script in the [myosuite repo](https://github.com/MyoHub/myosuite/tree/torque):
+   ```bash
+   cd /path/to/myosuite
+   python convert_h5_to_npz.py soccer1.h5          # looks in myosuite/envs/myo/mjx/
+   python convert_h5_to_npz.py /path/to/custom.h5  # or pass a full path
+   ```
+2. **Copy** the resulting `<name>_myoskeleton.npz` into `src/mjlab/asset_zoo/robots/myoskeleton/motions/`.
+3. **Update** `src/mjlab/tasks/tracking/config/myoskeleton/env_cfgs.py`:
+   ```python
+   motion_cmd.motion_file = str(MYOSKELETON_MOTION_DIR / "soccer1.npz")
+   ```
+4. **Re-run** training or playback as usual.
 
 ### 3. Sanity-check with Dummy Agents
 

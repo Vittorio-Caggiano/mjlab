@@ -170,14 +170,14 @@ def test_myoskeleton_tracking_has_correct_action_scale(
 def test_myoskeleton_tracking_has_correct_motion_file(
   myoskeleton_tracking_task_ids: list[str],
 ) -> None:
-  """MyoSkeleton tracking tasks should reference the soccer1.npz motion file."""
+  """MyoSkeleton tracking tasks should reference the standing_motion.npz motion file."""
   for task_id in myoskeleton_tracking_task_ids:
     cfg = load_env_cfg(task_id)
 
     motion_cmd = cfg.commands["motion"]
     assert isinstance(motion_cmd, MotionCommandCfg)
-    assert "soccer1.npz" in motion_cmd.motion_file, (
-      f"Task {task_id} motion_file={motion_cmd.motion_file}, expected soccer1.npz"
+    assert "standing_motion.npz" in motion_cmd.motion_file, (
+      f"Task {task_id} motion_file={motion_cmd.motion_file}, expected standing_motion.npz"
     )
 
 
@@ -244,8 +244,11 @@ def test_myoskeleton_tracking_scene_builds() -> None:
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]  # mjlab/
 _SIBLING = _REPO_ROOT.parent  # parent dir containing both mjlab/ and myosuite/
-H5_FILE = _SIBLING / "myosuite/myosuite/envs/myo/mjx/soccer1.h5"
+_H5_DIR = _SIBLING / "myosuite/myosuite/envs/myo/mjx"
 MODEL_XML = _SIBLING / "myosuite/myosuite/simhive/myo_model/myoskeleton/myoskeleton.xml"
+
+# Default motion used by the tracking task.
+H5_FILE = _H5_DIR / "standing_motion.h5"
 
 
 @pytest.mark.skipif(
@@ -253,7 +256,7 @@ MODEL_XML = _SIBLING / "myosuite/myosuite/simhive/myo_model/myoskeleton/myoskele
   reason="myosuite H5 motion or model XML not available",
 )
 def test_myoskeleton_npz_matches_h5_playback() -> None:
-  """Verify that soccer1.npz faithfully reproduces the original H5 motion.
+  """Verify that standing_motion.npz faithfully reproduces the original H5 motion.
 
   Loads the H5, plays it through the MuJoCo model (same procedure as the
   conversion script), and checks that body positions and joint positions
