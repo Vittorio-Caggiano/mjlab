@@ -12,6 +12,41 @@ from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
 from mjlab.tasks.velocity.velocity_env_cfg import make_velocity_env_cfg
 
 
+
+
+# Unitree-inspired posture tolerance schedule mapped to MyoSkeleton controlled joints.
+# Standing uses a single regex for tight default pose convergence.
+_MYOSKEL_UNITREE_POSE_STD_STANDING = {r"(hip|knee|ankle|subtalar)_.*": 0.05}
+
+# Walking/running values mirror Unitree G1 lower-body magnitudes, but mapped to
+# MyoSkeleton joint names (pitch/roll/yaw -> flexion/adduction/rotation).
+_MYOSKEL_UNITREE_POSE_STD_WALKING = {
+  r"hip_flexion_[lr]": 0.3,
+  r"hip_adduction_[lr]": 0.15,
+  r"hip_rotation_[lr]": 0.15,
+  r"knee_angle_[lr]": 0.35,
+  r"ankle_angle_[lr]": 0.25,
+  r"subtalar_angle_[lr]": 0.1,
+}
+
+_MYOSKEL_UNITREE_POSE_STD_RUNNING = {
+  r"hip_flexion_[lr]": 0.5,
+  r"hip_adduction_[lr]": 0.2,
+  r"hip_rotation_[lr]": 0.2,
+  r"knee_angle_[lr]": 0.6,
+  r"ankle_angle_[lr]": 0.35,
+  r"subtalar_angle_[lr]": 0.15,
+}
+
+_MYOSKEL_UNITREE_CONTROLLED_JOINT_REGEX = (
+  r"hip_flexion_[lr]",
+  r"hip_adduction_[lr]",
+  r"hip_rotation_[lr]",
+  r"knee_angle_[lr]",
+  r"ankle_angle_[lr]",
+  r"subtalar_angle_[lr]",
+)
+
 def myoskeleton_unitree_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   """Create a flat-terrain velocity task with Unitree-style MyoSkeleton control."""
   cfg = make_velocity_env_cfg()
@@ -41,6 +76,12 @@ def myoskeleton_unitree_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg
   assert isinstance(cmd_cfg, UniformVelocityCommandCfg)
   cmd_cfg.ranges.lin_vel_x = (-1.0, 1.0)
   cmd_cfg.ranges.lin_vel_y = (-0.5, 0.5)
+
+  # Restrict posture reward to the 12 controlled joints and use Unitree-like std schedule.
+  cfg.rewards["pose"].params["asset_cfg"].joint_names = _MYOSKEL_UNITREE_CONTROLLED_JOINT_REGEX
+  cfg.rewards["pose"].params["std_standing"] = _MYOSKEL_UNITREE_POSE_STD_STANDING
+  cfg.rewards["pose"].params["std_walking"] = _MYOSKEL_UNITREE_POSE_STD_WALKING
+  cfg.rewards["pose"].params["std_running"] = _MYOSKEL_UNITREE_POSE_STD_RUNNING
 
   cfg.events["foot_friction"].params["asset_cfg"].geom_names = (
     r"^(bofoot[12]?_[lr]_coll|foot[123]?_[lr]_coll)$"

@@ -52,3 +52,24 @@ def test_myoskeleton_unitree_flat_env_cfg_contact_budget() -> None:
   cfg = myoskeleton_unitree_flat_env_cfg()
   assert cfg.sim.njmax == 1000
   assert cfg.sim.nconmax == 100
+
+
+def test_myoskeleton_unitree_pose_std_dicts_are_populated_and_consistent() -> None:
+  cfg = myoskeleton_unitree_flat_env_cfg()
+  pose_params = cfg.rewards["pose"].params
+
+  standing = pose_params["std_standing"]
+  walking = pose_params["std_walking"]
+  running = pose_params["std_running"]
+
+  assert len(standing) > 0
+  assert len(walking) > 0
+  assert len(running) > 0
+
+  # Walking/running should target the same mapped joint groups.
+  assert set(walking.keys()) == set(running.keys())
+
+  # Standing should match the mapped controlled-joint family.
+  joint_patterns = pose_params["asset_cfg"].joint_names
+  assert r"hip_flexion_[lr]" in joint_patterns
+  assert r"subtalar_angle_[lr]" in joint_patterns
