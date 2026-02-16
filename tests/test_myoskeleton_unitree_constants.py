@@ -103,3 +103,14 @@ def test_mapped_joints_have_g1_natural_frequency_and_damping(model: mujoco.MjMod
 
     np.testing.assert_allclose(omega_n, g1_constants.NATURAL_FREQ, rtol=1e-6)
     np.testing.assert_allclose(zeta, g1_constants.DAMPING_RATIO, rtol=1e-6)
+
+
+def test_non_actuated_joints_are_removed(model: mujoco.MjModel) -> None:
+  joint_names = {model.joint(i).name for i in range(model.njnt)}
+
+  # Keep free root + explicitly controlled joints only.
+  expected = {"myoskeleton_root", *c.MYOSKELETON_UNITREE_CONTROLLED_JOINTS}
+  assert joint_names == expected
+
+  # 1 free joint + 12 hinge joints.
+  assert model.njnt == 13

@@ -75,23 +75,23 @@ def test_mapped_joint_step_responses_match_unitree_templates() -> None:
     np.testing.assert_allclose(g1_traj, myo_traj, rtol=1e-9, atol=1e-12)
 
 
-def test_state_action_ratio_explains_learning_gap_risk() -> None:
-  """Hybrid keeps many Myo DoFs in observation while only actuating 12 joints.
+def test_joint_pruning_reduces_policy_state_burden() -> None:
+  """Hybrid should expose only controlled joints (plus free root)."""
+  myo_model = Entity(get_myoskeleton_unitree_robot_cfg()).compile()
 
-  This mismatch is expected and is a likely reason training differs from G1,
-  despite matched low-level actuator templates.
-  """
-  g1_entity = Entity(get_g1_robot_cfg())
-  myo_entity = Entity(get_myoskeleton_unitree_robot_cfg())
-
-  # Both use 12 lower-body actions in velocity envs.
-  assert myo_entity.num_actuators == 12
-
-  # But MyoSkeleton has far more articulated joints seen by the policy.
-  assert myo_entity.num_joints > g1_entity.num_joints
-  assert myo_entity.num_joints >= 100
-
-  # Observation-to-action burden is therefore much larger for the hybrid.
-  g1_ratio = g1_entity.num_joints / 12.0
-  myo_ratio = myo_entity.num_joints / 12.0
-  assert myo_ratio > g1_ratio
+  joint_names = {myo_model.joint(i).name for i in range(myo_model.njnt)}
+  controlled = {
+    "hip_flexion_l",
+    "hip_adduction_l",
+    "hip_rotation_l",
+    "knee_angle_l",
+    "ankle_angle_l",
+    "subtalar_angle_l",
+    "hip_flexion_r",
+    "hip_adduction_r",
+    "hip_rotation_r",
+    "knee_angle_r",
+    "ankle_angle_r",
+    "subtalar_angle_r",
+  }
+  assert joint_names == {"myoskeleton_root", *controlled}

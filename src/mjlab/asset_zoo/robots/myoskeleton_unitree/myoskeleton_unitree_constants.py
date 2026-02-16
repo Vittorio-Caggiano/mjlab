@@ -8,7 +8,7 @@ lower-body control subset with Unitree G1-like settings.
 from mjlab.actuator import BuiltinPositionActuatorCfg
 from mjlab.asset_zoo.robots.myoskeleton.myoskeleton_constants import (
   STANDING_KEYFRAME,
-  get_spec,
+  get_spec as get_myoskeleton_spec,
 )
 from mjlab.asset_zoo.robots.unitree_g1.g1_constants import (
   ACTUATOR_5020,
@@ -42,6 +42,35 @@ MYOSKELETON_UNITREE_JOINT_MAP: dict[str, str] = {
 
 # Functional feet on the MyoSkeleton model (collision geoms only).
 MYOSKELETON_UNITREE_FOOT_GEOM_REGEX = r"^(bofoot[12]?_[lr]_coll|foot[123]?_[lr]_coll)$"
+
+
+# Keep only free root + Unitree-controlled joints in the hybrid model.
+MYOSKELETON_UNITREE_CONTROLLED_JOINTS: tuple[str, ...] = (
+  "hip_flexion_l",
+  "hip_adduction_l",
+  "hip_rotation_l",
+  "knee_angle_l",
+  "ankle_angle_l",
+  "subtalar_angle_l",
+  "hip_flexion_r",
+  "hip_adduction_r",
+  "hip_rotation_r",
+  "knee_angle_r",
+  "ankle_angle_r",
+  "subtalar_angle_r",
+)
+
+
+def get_spec():
+  """Load MyoSkeleton and remove all non-actuated joints for this hybrid."""
+  spec = get_myoskeleton_spec()
+
+  keep = {"myoskeleton_root", *MYOSKELETON_UNITREE_CONTROLLED_JOINTS}
+  for joint in list(spec.joints):
+    if joint.name not in keep:
+      spec.delete(joint)
+
+  return spec
 
 MYOSKELETON_UNITREE_HIP_PITCH_YAW = BuiltinPositionActuatorCfg(
   target_names_expr=("hip_flexion_l", "hip_flexion_r", "hip_rotation_l", "hip_rotation_r"),
