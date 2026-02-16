@@ -16,6 +16,10 @@ def myoskeleton_unitree_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg
   """Create a flat-terrain velocity task with Unitree-style MyoSkeleton control."""
   cfg = make_velocity_env_cfg()
 
+  # MyoSkeleton morphology produces more contacts than quadruped defaults.
+  cfg.sim.njmax = 1000
+  cfg.sim.nconmax = 100
+
   cfg.scene.entities = {"robot": get_myoskeleton_unitree_robot_cfg()}
 
   feet_ground_cfg = ContactSensorCfg(
@@ -43,14 +47,34 @@ def myoskeleton_unitree_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg
   )
   cfg.events["base_com"].params["asset_cfg"].body_names = ("pelvis",)
 
+  site_names = ("l_foot_touch", "r_foot_touch")
+  cfg.observations["critic"].terms["foot_height"].params["asset_cfg"].site_names = site_names
+  for reward_name in ["foot_clearance", "foot_swing_height", "foot_slip"]:
+    cfg.rewards[reward_name].params["asset_cfg"].site_names = site_names
+
   cfg.viewer.body_name = "pelvis"
   cfg.scene.terrain.terrain_type = "plane"
   cfg.scene.terrain.terrain_generator = None
+
+  # Flat terrain has no heightfield: remove raycast height scan wiring.
+  cfg.scene.sensors = tuple(
+    sensor for sensor in (cfg.scene.sensors or ()) if sensor.name != "terrain_scan"
+  )
+  del cfg.observations["actor"].terms["height_scan"]
+  del cfg.observations["critic"].terms["height_scan"]
+
+  # Disable terrain curriculum on flat terrain.
+  assert "terrain_levels" in cfg.curriculum
+  del cfg.curriculum["terrain_levels"]
 
   if play:
     cfg.episode_length_s = int(1e9)
     cfg.observations["actor"].enable_corruption = False
     cfg.events.pop("push_robot", None)
+
+    # Keep parity with other flat velocity tasks in play mode.
+    if "command_vel" in cfg.curriculum:
+      del cfg.curriculum["command_vel"]
 
   return cfg
 

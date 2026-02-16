@@ -21,3 +21,34 @@ def test_myoskeleton_unitree_flat_env_cfg() -> None:
 
   assert cfg.viewer.body_name == "pelvis"
   assert cfg.scene.terrain.terrain_type == "plane"
+
+
+def test_myoskeleton_unitree_flat_env_cfg_removes_height_scan() -> None:
+  cfg = myoskeleton_unitree_flat_env_cfg()
+
+  sensor_names = tuple(sensor.name for sensor in (cfg.scene.sensors or ()))
+  assert "terrain_scan" not in sensor_names
+  assert "height_scan" not in cfg.observations["actor"].terms
+  assert "height_scan" not in cfg.observations["critic"].terms
+  assert "terrain_levels" not in cfg.curriculum
+
+
+def test_myoskeleton_unitree_flat_env_cfg_play_removes_command_curriculum() -> None:
+  cfg = myoskeleton_unitree_flat_env_cfg(play=True)
+  assert "command_vel" not in cfg.curriculum
+
+
+def test_myoskeleton_unitree_flat_env_cfg_sets_foot_sites() -> None:
+  cfg = myoskeleton_unitree_flat_env_cfg()
+  site_names = cfg.observations["critic"].terms["foot_height"].params["asset_cfg"].site_names
+  assert site_names == ("l_foot_touch", "r_foot_touch")
+
+  for reward_name in ["foot_clearance", "foot_swing_height", "foot_slip"]:
+    reward_sites = cfg.rewards[reward_name].params["asset_cfg"].site_names
+    assert reward_sites == ("l_foot_touch", "r_foot_touch")
+
+
+def test_myoskeleton_unitree_flat_env_cfg_contact_budget() -> None:
+  cfg = myoskeleton_unitree_flat_env_cfg()
+  assert cfg.sim.njmax == 1000
+  assert cfg.sim.nconmax == 100
