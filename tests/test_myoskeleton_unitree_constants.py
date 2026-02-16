@@ -17,11 +17,12 @@ def model() -> mujoco.MjModel:
 
 
 def test_hybrid_entity_creation(model: mujoco.MjModel) -> None:
-  assert model.nu == 12
+  assert model.nu == 29
 
 
 def test_all_actuators_use_position_gains(model: mujoco.MjModel) -> None:
   expected_by_joint = {
+    # Lower body.
     "hip_flexion_l": c.MYOSKELETON_UNITREE_HIP_PITCH_YAW,
     "hip_flexion_r": c.MYOSKELETON_UNITREE_HIP_PITCH_YAW,
     "hip_rotation_l": c.MYOSKELETON_UNITREE_HIP_PITCH_YAW,
@@ -34,6 +35,26 @@ def test_all_actuators_use_position_gains(model: mujoco.MjModel) -> None:
     "ankle_angle_r": c.MYOSKELETON_UNITREE_ANKLE,
     "subtalar_angle_l": c.MYOSKELETON_UNITREE_ANKLE,
     "subtalar_angle_r": c.MYOSKELETON_UNITREE_ANKLE,
+    # Waist.
+    "L5_S1_Flex_Ext": c.MYOSKELETON_UNITREE_WAIST,
+    "L5_S1_Lat_Bending": c.MYOSKELETON_UNITREE_WAIST,
+    "L5_S1_axial_rotation": c.MYOSKELETON_UNITREE_WAIST,
+    # Arms 5020.
+    "shoulder_elv_l": c.MYOSKELETON_UNITREE_ARM_5020,
+    "shoulder1_r2_l": c.MYOSKELETON_UNITREE_ARM_5020,
+    "shoulder_rot_l": c.MYOSKELETON_UNITREE_ARM_5020,
+    "elbow_flex_l": c.MYOSKELETON_UNITREE_ARM_5020,
+    "pro_sup_l": c.MYOSKELETON_UNITREE_ARM_5020,
+    "shoulder_elv_r": c.MYOSKELETON_UNITREE_ARM_5020,
+    "shoulder1_r2_r": c.MYOSKELETON_UNITREE_ARM_5020,
+    "shoulder_rot_r": c.MYOSKELETON_UNITREE_ARM_5020,
+    "elbow_flex_r": c.MYOSKELETON_UNITREE_ARM_5020,
+    "pro_sup": c.MYOSKELETON_UNITREE_ARM_5020,
+    # Wrists 4010.
+    "flexion_l": c.MYOSKELETON_UNITREE_WRIST_4010,
+    "deviation_l": c.MYOSKELETON_UNITREE_WRIST_4010,
+    "flexion_r": c.MYOSKELETON_UNITREE_WRIST_4010,
+    "deviation": c.MYOSKELETON_UNITREE_WRIST_4010,
   }
 
   for i in range(model.nu):
@@ -85,10 +106,12 @@ def test_mapped_joints_have_g1_natural_frequency_and_damping(model: mujoco.MjMod
     "subtalar_angle_r": (g1_constants.STIFFNESS_5020 * 2, g1_constants.DAMPING_5020 * 2),
   }
 
-  # Proxy for matched actuator dynamics: same kp/kd and implied wn/zeta.
+  # Proxy for matched lower-body actuator dynamics: same kp/kd and implied wn/zeta.
   for i in range(model.nu):
     actuator = model.actuator(i)
     joint_name = actuator.name
+    if joint_name not in expected_params:
+      continue
 
     stiffness_expected, damping_expected = expected_params[joint_name]
     np.testing.assert_allclose(actuator.gainprm[0], stiffness_expected)
@@ -112,5 +135,21 @@ def test_non_actuated_joints_are_removed(model: mujoco.MjModel) -> None:
   expected = {"myoskeleton_root", *c.MYOSKELETON_UNITREE_CONTROLLED_JOINTS}
   assert joint_names == expected
 
-  # 1 free joint + 12 hinge joints.
-  assert model.njnt == 13
+  # 1 free joint + 29 hinge joints.
+  assert model.njnt == 30
+
+
+def test_unitree_joint_map_includes_upper_body() -> None:
+  # Arms + waist should be explicitly mapped.
+  for key in (
+    "waist_pitch_joint",
+    "waist_roll_joint",
+    "waist_yaw_joint",
+    "left_shoulder_pitch_joint",
+    "left_elbow_joint",
+    "left_wrist_pitch_joint",
+    "right_shoulder_pitch_joint",
+    "right_elbow_joint",
+    "right_wrist_pitch_joint",
+  ):
+    assert key in c.MYOSKELETON_UNITREE_JOINT_MAP

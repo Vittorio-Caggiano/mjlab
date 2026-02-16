@@ -10,6 +10,7 @@ These tests do two things:
 import numpy as np
 
 from mjlab.asset_zoo.robots import get_g1_robot_cfg, get_myoskeleton_unitree_robot_cfg
+from mjlab.asset_zoo.robots.myoskeleton_unitree import myoskeleton_unitree_constants as c
 from mjlab.entity import Entity
 
 
@@ -75,23 +76,10 @@ def test_mapped_joint_step_responses_match_unitree_templates() -> None:
     np.testing.assert_allclose(g1_traj, myo_traj, rtol=1e-9, atol=1e-12)
 
 
-def test_joint_pruning_reduces_policy_state_burden() -> None:
-  """Hybrid should expose only controlled joints (plus free root)."""
+def test_joint_pruning_keeps_all_mapped_unitree_joints() -> None:
+  """Hybrid should expose only mapped Unitree joints (plus free root)."""
   myo_model = Entity(get_myoskeleton_unitree_robot_cfg()).compile()
 
   joint_names = {myo_model.joint(i).name for i in range(myo_model.njnt)}
-  controlled = {
-    "hip_flexion_l",
-    "hip_adduction_l",
-    "hip_rotation_l",
-    "knee_angle_l",
-    "ankle_angle_l",
-    "subtalar_angle_l",
-    "hip_flexion_r",
-    "hip_adduction_r",
-    "hip_rotation_r",
-    "knee_angle_r",
-    "ankle_angle_r",
-    "subtalar_angle_r",
-  }
-  assert joint_names == {"myoskeleton_root", *controlled}
+  assert joint_names == {"myoskeleton_root", *c.MYOSKELETON_UNITREE_CONTROLLED_JOINTS}
+  assert myo_model.nu == len(c.MYOSKELETON_UNITREE_JOINT_MAP)

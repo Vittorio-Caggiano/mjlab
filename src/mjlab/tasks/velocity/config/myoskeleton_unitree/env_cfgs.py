@@ -15,27 +15,53 @@ from mjlab.tasks.velocity.velocity_env_cfg import make_velocity_env_cfg
 
 
 # Unitree-inspired posture tolerance schedule mapped to MyoSkeleton controlled joints.
-# Standing uses a single regex for tight default pose convergence.
-_MYOSKEL_UNITREE_POSE_STD_STANDING = {r"(hip|knee|ankle|subtalar)_.*": 0.05}
+_MYOSKEL_UNITREE_POSE_STD_STANDING = {
+  r"(hip|knee|ankle|subtalar|L5_S1|shoulder|elbow|pro_sup|flexion|deviation).*": 0.05
+}
 
-# Walking/running values mirror Unitree G1 lower-body magnitudes, but mapped to
-# MyoSkeleton joint names (pitch/roll/yaw -> flexion/adduction/rotation).
+# Values mirror Unitree G1 lower/waist/upper-body magnitudes mapped to Myo names.
 _MYOSKEL_UNITREE_POSE_STD_WALKING = {
+  # Lower body.
   r"hip_flexion_[lr]": 0.3,
   r"hip_adduction_[lr]": 0.15,
   r"hip_rotation_[lr]": 0.15,
   r"knee_angle_[lr]": 0.35,
   r"ankle_angle_[lr]": 0.25,
   r"subtalar_angle_[lr]": 0.1,
+  # Waist.
+  r"L5_S1_axial_rotation": 0.2,
+  r"L5_S1_Lat_Bending": 0.08,
+  r"L5_S1_Flex_Ext": 0.1,
+  # Arms.
+  r"shoulder_elv_[lr]": 0.15,
+  r"shoulder1_r2_[lr]": 0.15,
+  r"shoulder_rot_[lr]": 0.1,
+  r"elbow_flex_[lr]": 0.15,
+  r"pro_sup(_l)?$": 0.3,
+  r"flexion(_l|_r)?$": 0.3,
+  r"deviation(_l)?$": 0.3,
 }
 
 _MYOSKEL_UNITREE_POSE_STD_RUNNING = {
+  # Lower body.
   r"hip_flexion_[lr]": 0.5,
   r"hip_adduction_[lr]": 0.2,
   r"hip_rotation_[lr]": 0.2,
   r"knee_angle_[lr]": 0.6,
   r"ankle_angle_[lr]": 0.35,
   r"subtalar_angle_[lr]": 0.15,
+  # Waist.
+  r"L5_S1_axial_rotation": 0.3,
+  r"L5_S1_Lat_Bending": 0.08,
+  r"L5_S1_Flex_Ext": 0.2,
+  # Arms.
+  r"shoulder_elv_[lr]": 0.5,
+  r"shoulder1_r2_[lr]": 0.2,
+  r"shoulder_rot_[lr]": 0.15,
+  r"elbow_flex_[lr]": 0.35,
+  r"pro_sup(_l)?$": 0.3,
+  r"flexion(_l|_r)?$": 0.3,
+  r"deviation(_l)?$": 0.3,
 }
 
 _MYOSKEL_UNITREE_CONTROLLED_JOINT_REGEX = (
@@ -45,7 +71,16 @@ _MYOSKEL_UNITREE_CONTROLLED_JOINT_REGEX = (
   r"knee_angle_[lr]",
   r"ankle_angle_[lr]",
   r"subtalar_angle_[lr]",
+  r"L5_S1_(Flex_Ext|Lat_Bending|axial_rotation)",
+  r"shoulder_elv_[lr]",
+  r"shoulder1_r2_[lr]",
+  r"shoulder_rot_[lr]",
+  r"elbow_flex_[lr]",
+  r"pro_sup(_l)?$",
+  r"flexion(_l|_r)?$",
+  r"deviation(_l)?$",
 )
+
 
 def myoskeleton_unitree_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   """Create a flat-terrain velocity task with Unitree-style MyoSkeleton control."""
