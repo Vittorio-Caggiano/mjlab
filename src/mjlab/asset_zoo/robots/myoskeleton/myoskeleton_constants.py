@@ -170,8 +170,14 @@ _S_ARM, _D_ARM, _E_ARM, _A_ARM = _actuator_params(250)
 
 MYOSKELETON_ACTUATOR_ARM = BuiltinPositionActuatorCfg(
   target_names_expr=(
+    "shoulder_elv_r",
+    "shoulder1_r2_r",
+    "shoulder_rot_r",
     "elbow_flex_r",
     "pro_sup",
+    "shoulder_elv_l",
+    "shoulder1_r2_l",
+    "shoulder_rot_l",
     "elbow_flex_l",
     "pro_sup_l",
   ),

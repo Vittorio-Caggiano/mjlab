@@ -24,12 +24,19 @@ def _get_body_indexes(
 
 
 def motion_global_anchor_position_error_exp(
-  env: ManagerBasedRlEnv, command_name: str, std: float
+  env: ManagerBasedRlEnv,
+  command_name: str,
+  std: float,
+  ignore_z: bool = False,
 ) -> torch.Tensor:
+  """Exp(-position_error^2 / std^2). If ignore_z=True, only xy (horizontal) error is used."""
   command = cast(MotionCommand, env.command_manager.get_term(command_name))
-  error = torch.sum(
-    torch.square(command.anchor_pos_w - command.robot_anchor_pos_w), dim=-1
-  )
+  pos_ref = command.anchor_pos_w
+  pos_robot = command.robot_anchor_pos_w
+  if ignore_z:
+    pos_ref = pos_ref[..., :2]
+    pos_robot = pos_robot[..., :2]
+  error = torch.sum(torch.square(pos_ref - pos_robot), dim=-1)
   return torch.exp(-error / std**2)
 
 

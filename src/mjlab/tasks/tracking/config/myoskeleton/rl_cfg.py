@@ -40,6 +40,6 @@ def myoskeleton_tracking_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
     ),
     experiment_name="myoskeleton_tracking",
     save_interval=500,
-    num_steps_per_env=24,
+    num_steps_per_env=32,
     max_iterations=30_000,
   )

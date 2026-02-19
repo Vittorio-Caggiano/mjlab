@@ -311,8 +311,7 @@ class MotionCommand(CommandTerm):
       self._adaptive_sampling(env_ids)
 
     root_pos = (
-      self.motion.root_pos_w[self.time_steps].clone()
-      + self._env.scene.env_origins
+      self.motion.root_pos_w[self.time_steps].clone() + self._env.scene.env_origins
     )
     root_ori = self.motion.root_quat_w[self.time_steps].clone()
     root_lin_vel = self.motion.root_lin_vel_w[self.time_steps].clone()

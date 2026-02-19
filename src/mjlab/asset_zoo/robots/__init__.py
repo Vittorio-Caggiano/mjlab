@@ -10,12 +10,6 @@ from mjlab.asset_zoo.robots.myoskeleton.myoskeleton_constants import (
 from mjlab.asset_zoo.robots.myoskeleton.myoskeleton_constants import (
   get_myoskeleton_robot_cfg as get_myoskeleton_robot_cfg,
 )
-from mjlab.asset_zoo.robots.myoskeleton_unitree.myoskeleton_unitree_constants import (
-  MYOSKELETON_UNITREE_ACTION_SCALE as MYOSKELETON_UNITREE_ACTION_SCALE,
-)
-from mjlab.asset_zoo.robots.myoskeleton_unitree.myoskeleton_unitree_constants import (
-  get_myoskeleton_unitree_robot_cfg as get_myoskeleton_unitree_robot_cfg,
-)
 from mjlab.asset_zoo.robots.unitree_g1.g1_constants import (
   G1_ACTION_SCALE as G1_ACTION_SCALE,
 )

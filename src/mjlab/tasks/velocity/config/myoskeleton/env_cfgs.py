@@ -1,6 +1,5 @@
 """MyoSkeleton velocity environment configurations."""
 
-import copy
 import math
 
 from mjlab.asset_zoo.robots import (
@@ -99,10 +98,10 @@ def myoskeleton_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   cfg.rewards["pose"].params["std_standing"] = {".*": 0.05}
   cfg.rewards["pose"].params["std_walking"] = {".*": 0.2}
   cfg.rewards["pose"].params["std_running"] = {".*": 0.4}
-  cfg.rewards["pose"].weight = 5.0 # Increased for stability.
+  cfg.rewards["pose"].weight = 5.0  # Increased for stability.
 
   cfg.rewards["alive"] = RewardTermCfg(func=envs_mdp.is_alive, weight=10.0)
-  cfg.rewards["upright"].weight = 5.0 # Increased weight.
+  cfg.rewards["upright"].weight = 5.0  # Increased weight.
 
   cfg.rewards["body_ang_vel"].weight = -0.05
   cfg.rewards["angular_momentum"].weight = -0.01
@@ -117,25 +116,27 @@ def myoskeleton_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   cfg.rewards["action_rate_l2"].weight = -0.01
 
   # Terminations: Tighten height and orientation limits for stability.
-  cfg.terminations["fell_over"].params["limit_angle"] = 1.0 # ~57 deg
+  cfg.terminations["fell_over"].params["limit_angle"] = 1.0  # ~57 deg
   cfg.terminations["base_height"] = TerminationTermCfg(
     func=envs_mdp.root_height_below_minimum, params={"minimum_height": 0.6}
   )
 
-  # Lower stiffness and increase scale for movement exploration.
+  # Lower stiffness during training for movement exploration; keep full stiffness
+  # at play so the policy's targets are actually tracked (otherwise the character
+  # falls without visible limb correction).
   robot_cfg = cfg.scene.entities["robot"]
   from mjlab.actuator import BuiltinPositionActuatorCfg
 
-  for actuator_cfg in robot_cfg.articulation.actuators:
-    if isinstance(actuator_cfg, BuiltinPositionActuatorCfg):
-      # Use a moderately high stiffness to maintain posture but low enough to move.
-      actuator_cfg.stiffness *= 0.5
-      actuator_cfg.damping *= 1.0
+  if not play:
+    for actuator_cfg in robot_cfg.articulation.actuators:
+      if isinstance(actuator_cfg, BuiltinPositionActuatorCfg):
+        actuator_cfg.stiffness *= 0.5
+        actuator_cfg.damping *= 1.0
 
   # Action scale.
   joint_pos_action = cfg.actions["joint_pos"]
   assert isinstance(joint_pos_action, JointPositionActionCfg)
-  joint_pos_action.scale = 0.2 # ~11 degrees.
+  joint_pos_action.scale = 0.2  # ~11 degrees.
 
   # MDP Term Overrides.
   cfg.events["reset_robot_joints"].params["position_range"] = (-0.05, 0.05)
@@ -174,8 +175,9 @@ def myoskeleton_standing_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   - All envs receive zero velocity commands (standing only).
   - Locomotion-specific rewards (foot clearance, swing height, air time)
     are disabled.
-  - Tighter default-pose tolerance and higher upright/alive weights.
-  - No push perturbations initially (added via curriculum / sweep).
+  - Alive/upright dominant; light movement penalties so the policy can
+    step to recover from pushes (not just hold still).
+  - Training: periodic push perturbations. Play: no automatic pushes.
   - No velocity curriculum.
   """
   cfg = myoskeleton_flat_env_cfg(play=play)
@@ -188,20 +190,23 @@ def myoskeleton_standing_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   twist_cmd.ranges.lin_vel_y = (0.0, 0.0)
   twist_cmd.ranges.ang_vel_z = (0.0, 0.0)
 
-  # ── Rewards: standing-focused ────────────────────────────────────────────
-  # Core standing rewards — increase weights for static balance.
-  cfg.rewards["alive"].weight = 15.0
-  cfg.rewards["upright"].weight = 8.0
+  # ── Rewards: standing with stepping recovery ─────────────────────────────
+  # Prioritize alive + upright so the policy can use any strategy (including
+  # stepping) to stay up. Avoid heavy penalties on movement so stepping is
+  # not worse than holding still.
+  cfg.rewards["alive"].weight = 25.0
+  cfg.rewards["upright"].weight = 12.0
 
-  # Default pose is critical for standing — tighten tolerance.
-  cfg.rewards["pose"].weight = 8.0
-  cfg.rewards["pose"].params["std_standing"] = {".*": 0.03}  # Tighter.
+  # Pose: mild pull toward default but not dominant (stepping deviates from pose).
+  cfg.rewards["pose"].weight = 3.0
+  cfg.rewards["pose"].params["std_standing"] = {".*": 0.05}
 
-  # Velocity tracking still works (target=0, so reward stillness).
-  cfg.rewards["track_linear_velocity"].weight = 5.0
-  cfg.rewards["track_linear_velocity"].params["std"] = 0.3  # Tighter kernel.
-  cfg.rewards["track_angular_velocity"].weight = 3.0
-  cfg.rewards["track_angular_velocity"].params["std"] = 0.3
+  # Velocity tracking: reward stillness but use wider kernel so a step (temporary
+  # velocity) is not heavily penalized — encourages return to still after recovery.
+  cfg.rewards["track_linear_velocity"].weight = 2.0
+  cfg.rewards["track_linear_velocity"].params["std"] = 0.5
+  cfg.rewards["track_angular_velocity"].weight = 1.5
+  cfg.rewards["track_angular_velocity"].params["std"] = 0.5
 
   # Disable locomotion-specific rewards (meaningless for standing).
   cfg.rewards["foot_clearance"].weight = 0.0
@@ -210,18 +215,33 @@ def myoskeleton_standing_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   cfg.rewards["air_time"].weight = 0.0
   cfg.rewards["soft_landing"].weight = 0.0
 
-  # Penalize unnecessary movement more.
-  cfg.rewards["action_rate_l2"].weight = -0.05
-  cfg.rewards["body_ang_vel"].weight = -0.1
+  # Light penalties on movement so stepping is viable (was -0.05 / -0.1 / -0.005).
+  cfg.rewards["action_rate_l2"].weight = -0.01
+  cfg.rewards["body_ang_vel"].weight = -0.03
+  cfg.rewards["joint_vel"] = RewardTermCfg(func=envs_mdp.joint_vel_l2, weight=-0.001)
 
-  # Penalize joint velocity to discourage oscillation.
-  cfg.rewards["joint_vel"] = RewardTermCfg(
-    func=envs_mdp.joint_vel_l2, weight=-0.005
-  )
-
-  # ── Events: easier initial conditions ────────────────────────────────────
-  # No push perturbations initially — robot learns to stand first.
-  cfg.events.pop("push_robot", None)
+  # ── Events: perturbations for stepping recovery ───────────────────────────
+  # Training: keep push_robot with milder magnitude so the policy learns to
+  # step to recover. Play: disable so automatic pushes are off (user can still
+  # use viewer perturbations).
+  if play:
+    cfg.events.pop("push_robot", None)
+  else:
+    cfg.events["push_robot"] = EventTermCfg(
+      func=mdp.push_by_setting_velocity,
+      mode="interval",
+      interval_range_s=(1.5, 3.5),
+      params={
+        "velocity_range": {
+          "x": (-0.35, 0.35),
+          "y": (-0.35, 0.35),
+          "z": (-0.25, 0.25),
+          "roll": (-0.35, 0.35),
+          "pitch": (-0.35, 0.35),
+          "yaw": (-0.5, 0.5),
+        },
+      },
+    )
 
   # Minimal joint randomization at reset.
   cfg.events["reset_robot_joints"].params["position_range"] = (-0.02, 0.02)

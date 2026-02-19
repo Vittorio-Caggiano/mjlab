@@ -271,20 +271,49 @@ def test_myoskeleton_npz_matches_h5_playback() -> None:
 
   all_joint_names = [model.joint(i).name for i in range(model.njnt)]
   FINGER_JOINTS = {
-    "cmc_flexion_r", "cmc_abduction_r", "mp_flexion_r", "ip_flexion_r",
-    "mcp2_flexion_r", "mcp2_abduction_r", "pm2_flexion_r", "md2_flexion_r",
-    "mcp3_flexion_r", "mcp3_abduction_r", "pm3_flexion_r", "md3_flexion_r",
-    "mcp4_flexion_r", "mcp4_abduction_r", "pm4_flexion_r", "md4_flexion_r",
-    "mcp5_flexion_r", "mcp5_abduction_r", "pm5_flexion_r", "md5_flexion_r",
-    "cmc_flexion_l", "cmc_abduction_l", "mp_flexion_l", "ip_flexion_l",
-    "mcp2_flexion_l", "mcp2_abduction_l", "pm2_flexion_l", "md2_flexion_l",
-    "mcp3_flexion_l", "mcp3_abduction_l", "pm3_flexion_l", "md3_flexion_l",
-    "mcp4_flexion_l", "mcp4_abduction_l", "pm4_flexion_l", "md4_flexion_l",
-    "mcp5_flexion_l", "mcp5_abduction_l", "pm5_flexion_l", "md5_flexion_l",
+    "cmc_flexion_r",
+    "cmc_abduction_r",
+    "mp_flexion_r",
+    "ip_flexion_r",
+    "mcp2_flexion_r",
+    "mcp2_abduction_r",
+    "pm2_flexion_r",
+    "md2_flexion_r",
+    "mcp3_flexion_r",
+    "mcp3_abduction_r",
+    "pm3_flexion_r",
+    "md3_flexion_r",
+    "mcp4_flexion_r",
+    "mcp4_abduction_r",
+    "pm4_flexion_r",
+    "md4_flexion_r",
+    "mcp5_flexion_r",
+    "mcp5_abduction_r",
+    "pm5_flexion_r",
+    "md5_flexion_r",
+    "cmc_flexion_l",
+    "cmc_abduction_l",
+    "mp_flexion_l",
+    "ip_flexion_l",
+    "mcp2_flexion_l",
+    "mcp2_abduction_l",
+    "pm2_flexion_l",
+    "md2_flexion_l",
+    "mcp3_flexion_l",
+    "mcp3_abduction_l",
+    "pm3_flexion_l",
+    "md3_flexion_l",
+    "mcp4_flexion_l",
+    "mcp4_abduction_l",
+    "pm4_flexion_l",
+    "md4_flexion_l",
+    "mcp5_flexion_l",
+    "mcp5_abduction_l",
+    "pm5_flexion_l",
+    "md5_flexion_l",
   }
   actuated_joints = [
-    n for n in all_joint_names
-    if n != "myoskeleton_root" and n not in FINGER_JOINTS
+    n for n in all_joint_names if n != "myoskeleton_root" and n not in FINGER_JOINTS
   ]
 
   # ── Load H5 ─────────────────────────────────────────────────────────────
@@ -331,7 +360,9 @@ def test_myoskeleton_npz_matches_h5_playback() -> None:
 
     # Compare body positions.
     np.testing.assert_allclose(
-      data.xpos, npz_body_pos[t], atol=1e-4,
+      data.xpos,
+      npz_body_pos[t],
+      atol=1e-4,
       err_msg=f"body_pos_w mismatch at t={t}",
     )
 
@@ -341,8 +372,7 @@ def test_myoskeleton_npz_matches_h5_playback() -> None:
       q_npz = npz_body_quat[t, b]
       dot = np.abs(np.dot(q_sim, q_npz))
       assert dot > 0.999, (
-        f"body_quat_w mismatch at t={t}, body {model.body(b).name}: "
-        f"dot={dot:.6f}"
+        f"body_quat_w mismatch at t={t}, body {model.body(b).name}: dot={dot:.6f}"
       )
 
     # Compare actuated joint positions.
@@ -351,7 +381,9 @@ def test_myoskeleton_npz_matches_h5_playback() -> None:
         model_idx = all_joint_names.index(jn)
         qadr = model.jnt_qposadr[model_idx]
         np.testing.assert_allclose(
-          data.qpos[qadr], npz_joint_pos[t, j_idx], atol=1e-5,
+          data.qpos[qadr],
+          npz_joint_pos[t, j_idx],
+          atol=1e-5,
           err_msg=f"joint_pos mismatch at t={t}, joint {jn}",
         )
 
@@ -385,7 +417,13 @@ def test_standing_task_disables_locomotion_rewards() -> None:
   """Standing task should disable foot clearance, swing height, air time, etc."""
   cfg = load_env_cfg("Mjlab-Standing-Flat-MyoSkeleton")
 
-  for reward_name in ["foot_clearance", "foot_swing_height", "foot_slip", "air_time", "soft_landing"]:
+  for reward_name in [
+    "foot_clearance",
+    "foot_swing_height",
+    "foot_slip",
+    "air_time",
+    "soft_landing",
+  ]:
     assert cfg.rewards[reward_name].weight == 0.0, (
       f"Standing task reward '{reward_name}' weight={cfg.rewards[reward_name].weight}, expected 0.0"
     )

@@ -213,7 +213,7 @@ def make_tracking_env_cfg() -> ManagerBasedRlEnvCfg:
     "motion_global_root_pos": RewardTermCfg(
       func=mdp.motion_global_anchor_position_error_exp,
       weight=0.5,
-      params={"command_name": "motion", "std": 0.3},
+      params={"command_name": "motion", "std": 0.3, "ignore_z": False},
     ),
     "motion_global_root_ori": RewardTermCfg(
       func=mdp.motion_global_anchor_orientation_error_exp,

@@ -1,5 +1,8 @@
 """MyoSkeleton flat tracking environment configurations."""
 
+import math
+
+from mjlab.actuator import BuiltinPositionActuatorCfg
 from mjlab.asset_zoo.robots import (
   MYOSKELETON_ACTION_SCALE,
   get_myoskeleton_robot_cfg,
@@ -23,6 +26,16 @@ def myoskeleton_flat_tracking_env_cfg(
 
   cfg.scene.entities = {"robot": get_myoskeleton_robot_cfg()}
 
+  # 0.25x stiffness (aligned with velocity sweep-best) for better tracking.
+  stiff_scale = 0.25
+  damp_scale = math.sqrt(stiff_scale)
+  robot_cfg = cfg.scene.entities["robot"]
+  for actuator_cfg in robot_cfg.articulation.actuators:
+    if isinstance(actuator_cfg, BuiltinPositionActuatorCfg):
+      actuator_cfg.stiffness *= stiff_scale
+      actuator_cfg.damping *= damp_scale
+  cfg.rewards["action_rate_l2"].weight = 0.0
+
   # Self-collision sensor using pelvis subtree.
   self_collision_cfg = ContactSensorCfg(
     name="self_collision",
@@ -44,7 +57,8 @@ def myoskeleton_flat_tracking_env_cfg(
   assert isinstance(motion_cmd, MotionCommandCfg)
   motion_cmd.anchor_body_name = "pelvis"
   motion_cmd.body_names = MYOSKELETON_TRACKING_BODIES
-  motion_cmd.motion_file = str(MYOSKELETON_MOTION_DIR / "standing_motion.npz")
+  # motion_cmd.motion_file = str(MYOSKELETON_MOTION_DIR / "standing_motion.npz")
+  motion_cmd.motion_file = str(MYOSKELETON_MOTION_DIR / "soccer1.npz")
 
   # Domain randomization: foot friction geoms and base COM body.
   # The myoskeleton uses capsule collision geoms (class myo_coll).

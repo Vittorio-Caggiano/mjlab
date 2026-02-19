@@ -90,4 +90,3 @@ Table of Contents
    source/sensors
    source/raycast_sensor
    source/distributed_training
-   source/myoskeleton_unitree_actuation_plan
