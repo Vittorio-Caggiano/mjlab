@@ -1,7 +1,6 @@
 """Benchmark sweep for MyoSkeleton velocity tracking task.
 
-Runs short training experiments for Mjlab-Velocity-Flat-MyoSkeleton or
-Mjlab-Velocity-Flat-MyoSkeleton-Unitree (--task unitree), sweeping the same
+Runs short training experiments for Mjlab-Velocity-Flat-MyoSkeleton, sweeping the same
 axes used in the standing sweep (adapted for velocity command tracking):
 
   Axis 1: Stiffness scale — how stiff should the PD controller be?
@@ -15,7 +14,6 @@ reward.
 
 Usage:
     uv run python scripts/benchmarks/run_myoskeleton_velocity_sweep.py
-    uv run python scripts/benchmarks/run_myoskeleton_velocity_sweep.py --task unitree
     uv run python scripts/benchmarks/run_myoskeleton_velocity_sweep.py --max-iterations 1000
     uv run python scripts/benchmarks/run_myoskeleton_velocity_sweep.py --cases baseline axis1_stiff_1.0x
     uv run python scripts/benchmarks/run_myoskeleton_velocity_sweep.py --list
@@ -319,7 +317,6 @@ def _find_latest_run(experiment_root: Path, before_ts: float) -> Path | None:
 
 # Task IDs for velocity sweep (video is passed via --video to train script).
 VELOCITY_TASK_MYOSKELETON = "Mjlab-Velocity-Flat-MyoSkeleton"
-VELOCITY_TASK_UNITREE = "Mjlab-Velocity-Flat-MyoSkeleton-Unitree"
 
 
 def run_case(
@@ -415,21 +412,12 @@ def main() -> None:
   parser.add_argument("--save-interval", type=int, default=100)
   parser.add_argument("--num-envs", type=int, default=2048)
   parser.add_argument("--logger", default="wandb", choices=["wandb", "tensorboard"])
-  parser.add_argument(
-    "--task",
-    choices=["myoskeleton", "unitree"],
-    default="myoskeleton",
-    help=(
-      "Velocity task to run: myoskeleton (default) or unitree "
-      "(Mjlab-Velocity-Flat-MyoSkeleton-Unitree). Video rendering applies to both."
-    ),
-  )
+
   parser.add_argument(
     "--experiment-name",
     default=None,
     help=(
-      "W&B / TensorBoard experiment name. Default: myoskeleton_velocity or "
-      "myoskeleton_velocity_unitree when --task unitree."
+      "W&B / TensorBoard experiment name. Default: myoskeleton_velocity "
     ),
   )
   parser.add_argument("--output-dir", default=None)
@@ -455,12 +443,10 @@ def main() -> None:
       parser.error(f"Unknown cases: {unknown}. Use --list to see available cases.")
     selected = [all_cases[n] for n in args.cases]
 
-  task_id = (
-    VELOCITY_TASK_UNITREE if args.task == "unitree" else VELOCITY_TASK_MYOSKELETON
-  )
-  experiment_name = args.experiment_name or (
-    "myoskeleton_velocity_unitree" if args.task == "unitree" else "myoskeleton_velocity"
-  )
+  task_id = VELOCITY_TASK_MYOSKELETON
+
+  experiment_name = "myoskeleton_velocity"
+
 
   output_dir = (
     Path(args.output_dir)
