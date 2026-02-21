@@ -3,9 +3,11 @@
 import pytest
 
 from mjlab.asset_zoo.robots import G1_ACTION_SCALE, GO1_ACTION_SCALE
-from mjlab.envs.mdp.actions import JointPositionActionCfg
+from mjlab.envs.mdp.actions import JointPositionActionCfg, TendonEffortActionCfg
 from mjlab.tasks.registry import list_tasks, load_env_cfg
 from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
+
+VELOCITY_TASK_MYOLEG = "Mjlab-Velocity-Flat-MyoLeg"
 
 
 @pytest.fixture(scope="module")
@@ -36,6 +38,12 @@ def rough_velocity_task_ids(velocity_task_ids: list[str]) -> list[str]:
 def flat_velocity_task_ids(velocity_task_ids: list[str]) -> list[str]:
   """Get all flat terrain velocity task IDs."""
   return [t for t in velocity_task_ids if "Flat" in t]
+
+
+@pytest.fixture(scope="module")
+def myoleg_velocity_task_ids() -> list[str]:
+  """Get MyoLeg velocity task ID (muscle-controlled, tendon effort)."""
+  return [VELOCITY_TASK_MYOLEG]
 
 
 def test_velocity_tasks_have_twist_command(velocity_task_ids: list[str]) -> None:
@@ -192,3 +200,31 @@ def test_go1_velocity_has_correct_action_scale(
     assert joint_pos_action.scale == GO1_ACTION_SCALE, (
       f"Task {task_id} action scale mismatch, expected GO1_ACTION_SCALE"
     )
+
+
+def test_myoleg_velocity_has_twist_and_flat_terrain(
+  myoleg_velocity_task_ids: list[str],
+) -> None:
+  """MyoLeg velocity task should have twist command and flat terrain."""
+  for task_id in myoleg_velocity_task_ids:
+    cfg = load_env_cfg(task_id)
+    assert "twist" in cfg.commands
+    assert cfg.commands["twist"] is not None
+    twist_cmd = cfg.commands["twist"]
+    assert isinstance(twist_cmd, UniformVelocityCommandCfg)
+    assert cfg.scene.terrain is not None
+    assert cfg.scene.terrain.terrain_type == "plane"
+    assert cfg.scene.terrain.terrain_generator is None
+
+
+def test_myoleg_velocity_has_tendon_effort_action(
+  myoleg_velocity_task_ids: list[str],
+) -> None:
+  """MyoLeg velocity task should use tendon_effort action (muscle control)."""
+  for task_id in myoleg_velocity_task_ids:
+    cfg = load_env_cfg(task_id)
+    assert "tendon_effort" in cfg.actions
+    act = cfg.actions["tendon_effort"]
+    assert isinstance(act, TendonEffortActionCfg)
+    assert act.entity_name == "robot"
+    assert cfg.scene.entities.get("robot") is not None

@@ -63,10 +63,18 @@ class RslRlVecEnvWrapper(VecEnv):
 
   def get_observations(self) -> TensorDict:
     obs_dict = self.unwrapped.observation_manager.compute()
+    obs_dict = {
+      k: v.float() if isinstance(v, torch.Tensor) and v.is_floating_point() else v
+      for k, v in obs_dict.items()
+    }
     return TensorDict(obs_dict, batch_size=[self.num_envs])
 
   def reset(self) -> tuple[TensorDict, dict]:
     obs_dict, extras = self.env.reset()
+    obs_dict = {
+      k: v.float() if isinstance(v, torch.Tensor) and v.is_floating_point() else v
+      for k, v in obs_dict.items()
+    }
     return TensorDict(obs_dict, batch_size=[self.num_envs]), extras
 
   def step(
@@ -81,6 +89,11 @@ class RslRlVecEnvWrapper(VecEnv):
     dones = term_or_trunc.to(dtype=torch.long)
     if not self.cfg.is_finite_horizon:
       extras["time_outs"] = truncated
+    # Cast observations to float32 for policy (same as get_observations).
+    obs_dict = {
+      k: v.float() if isinstance(v, torch.Tensor) and v.is_floating_point() else v
+      for k, v in obs_dict.items()
+    }
     return (
       TensorDict(obs_dict, batch_size=[self.num_envs]),
       rew,

@@ -157,7 +157,7 @@ class EntityData:
     env_ids = self._resolve_env_ids(env_ids)
     joint_ids = joint_ids if joint_ids is not None else slice(None)
     q_slice = self.indexing.joint_q_adr[joint_ids]
-    self.data.qpos[env_ids, q_slice] = position
+    self.data.qpos[env_ids, q_slice] = position.to(self.data.qpos.dtype)
 
   def write_joint_velocity(
     self,
@@ -171,7 +171,7 @@ class EntityData:
     env_ids = self._resolve_env_ids(env_ids)
     joint_ids = joint_ids if joint_ids is not None else slice(None)
     v_slice = self.indexing.joint_v_adr[joint_ids]
-    self.data.qvel[env_ids, v_slice] = velocity
+    self.data.qvel[env_ids, v_slice] = velocity.to(self.data.qvel.dtype)
 
   def write_external_wrench(
     self,

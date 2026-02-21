@@ -76,7 +76,7 @@ def _stiffness_overrides(scale: float, *, unitree: bool = False) -> list[str]:
   """CLI overrides to scale all actuator stiffnesses; damping by sqrt(scale)."""
   overrides: list[str] = []
   damping_scale = math.sqrt(scale)
-  articulation =  MYOSKELETON_ARTICULATION
+  articulation = MYOSKELETON_ARTICULATION
 
   for idx, act in enumerate(articulation.actuators):
     assert isinstance(act, BuiltinPositionActuatorCfg)
@@ -104,10 +104,10 @@ def _action_scale_override(scale: float) -> list[str]:
 
 def _relaxed_termination_overrides(
   *,
-  episode_length_s: float = 40,#20.0,
-  anchor_pos_threshold: float = 0.8,#0.4,
-  anchor_ori_threshold: float = 1.6,#1.0,
-  ee_body_pos_threshold: float = 0.8,#0.4,
+  episode_length_s: float = 40,  # 20.0,
+  anchor_pos_threshold: float = 0.8,  # 0.4,
+  anchor_ori_threshold: float = 1.6,  # 1.0,
+  ee_body_pos_threshold: float = 0.8,  # 0.4,
 ) -> list[str]:
   """CLI overrides to relax terminations and allow more exploration."""
   return [
@@ -164,12 +164,14 @@ def _all_cases(*, unitree: bool = False) -> dict[str, Case]:
       anchor_pos_threshold=0.4,
       anchor_ori_threshold=1.0,
       ee_body_pos_threshold=0.4,
-    )+
-    ["--env.rewards.motion_global_root_pos.weight",
+    )
+    + [
+      "--env.rewards.motion_global_root_pos.weight",
       "0.0",
       "--env.rewards.motion_global_root_ori.weight",
       "0.0",
-    ])
+    ]
+  )
 
   cases["baseline_relaxed_no_root"] = Case(
     name="baseline_relaxed_no_root",

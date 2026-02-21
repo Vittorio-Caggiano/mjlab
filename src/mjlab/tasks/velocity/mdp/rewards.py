@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING
 
 import torch
@@ -118,6 +119,35 @@ def angular_momentum_penalty(
   angmom_magnitude = torch.sqrt(angmom_magnitude_sq)
   env.extras["log"]["Metrics/angular_momentum_mean"] = torch.mean(angmom_magnitude)
   return angmom_magnitude_sq
+
+
+def cyclic_hip_flexion_penalty(
+  env: ManagerBasedRlEnv,
+  hip_period: int,
+  amplitude: float,
+  asset_cfg: SceneEntityCfg = _DEFAULT_ASSET_CFG,
+) -> torch.Tensor:
+  """Penalize deviation from a phase-based hip flexion pattern (myoLegWalk-style).
+
+  Desired pattern: des_l = amplitude * cos(phase*2π + π), des_r = amplitude * cos(phase*2π),
+  with phase = (step % hip_period) / hip_period. Use a negative weight so this term
+  penalizes deviation from the cyclic gait.
+  """
+  asset: Entity = env.scene[asset_cfg.name]
+  phase = (env.common_step_counter % hip_period) / hip_period
+  two_pi = 2.0 * math.pi
+  des_l = amplitude * math.cos(phase * two_pi + math.pi)
+  des_r = amplitude * math.cos(phase * two_pi)
+  desired = torch.tensor(
+    [des_l, des_r],
+    device=env.device,
+    dtype=asset.data.joint_pos.dtype,
+  )
+  # [num_envs, 2]; same desired for all envs
+  desired = desired.unsqueeze(0).expand(env.num_envs, 2)
+  actual = asset.data.joint_pos[:, asset_cfg.joint_ids]  # [B, 2]
+  error = torch.norm(actual - desired, dim=1)  # [B]
+  return error
 
 
 def feet_air_time(

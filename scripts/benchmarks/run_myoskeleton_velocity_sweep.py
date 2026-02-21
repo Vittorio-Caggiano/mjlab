@@ -416,9 +416,7 @@ def main() -> None:
   parser.add_argument(
     "--experiment-name",
     default=None,
-    help=(
-      "W&B / TensorBoard experiment name. Default: myoskeleton_velocity "
-    ),
+    help=("W&B / TensorBoard experiment name. Default: myoskeleton_velocity "),
   )
   parser.add_argument("--output-dir", default=None)
   parser.add_argument(
@@ -446,7 +444,6 @@ def main() -> None:
   task_id = VELOCITY_TASK_MYOSKELETON
 
   experiment_name = "myoskeleton_velocity"
-
 
   output_dir = (
     Path(args.output_dir)

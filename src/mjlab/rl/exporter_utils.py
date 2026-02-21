@@ -19,46 +19,63 @@ def list_to_csv_str(arr, *, decimals: int = 3, delimiter: str = ",") -> str:
   )
 
 
+def _action_scale_list(action_term) -> list:
+  """Extract action scale as a list from an action term (joint_pos or tendon_effort)."""
+  scale = action_term._scale
+  if isinstance(scale, torch.Tensor):
+    return scale[0].cpu().tolist()
+  return [scale] if isinstance(scale, (int, float)) else list(scale)
+
+
 def get_base_metadata(
   env: ManagerBasedRlEnv, run_path: str
 ) -> dict[str, list | str | float]:
   """Get base metadata common to all RL policy exports.
 
-  Args:
-    env: The RL environment.
-    run_path: W&B run path or other identifier.
-
-  Returns:
-    Dictionary of metadata fields that are common across all tasks.
+  Supports both joint_pos (e.g. MyoSkeleton) and tendon_effort (e.g. MyoLeg) tasks.
   """
   robot: Entity = env.scene["robot"]
-  joint_action = env.action_manager.get_term("joint_pos")
-  assert isinstance(joint_action, JointPositionAction)
-  # Build mapping from joint name to actuator ID for natural joint order.
-  # Each spec actuator controls exactly one joint (via its target field).
-  joint_name_to_ctrl_id = {}
-  for actuator in robot.spec.actuators:
-    joint_name = actuator.target.split("/")[-1]
-    joint_name_to_ctrl_id[joint_name] = actuator.id
-  # Get actuator IDs in natural joint order (same order as robot.joint_names).
-  ctrl_ids_natural = [
-    joint_name_to_ctrl_id[jname]
-    for jname in robot.joint_names  # global joint order
-    if jname in joint_name_to_ctrl_id  # skip non-actuated joints
-  ]
-  joint_stiffness = env.sim.mj_model.actuator_gainprm[ctrl_ids_natural, 0]
-  joint_damping = -env.sim.mj_model.actuator_biasprm[ctrl_ids_natural, 2]
+
+  if "joint_pos" in env.action_manager.cfg:
+    joint_action = env.action_manager.get_term("joint_pos")
+    assert isinstance(joint_action, JointPositionAction)
+    joint_name_to_ctrl_id = {}
+    for actuator in robot.spec.actuators:
+      joint_name = actuator.target.split("/")[-1]
+      joint_name_to_ctrl_id[joint_name] = actuator.id
+    ctrl_ids_natural = [
+      joint_name_to_ctrl_id[jname]
+      for jname in robot.joint_names
+      if jname in joint_name_to_ctrl_id
+    ]
+    joint_stiffness = env.sim.mj_model.actuator_gainprm[ctrl_ids_natural, 0]
+    joint_damping = -env.sim.mj_model.actuator_biasprm[ctrl_ids_natural, 2]
+    return {
+      "run_path": run_path,
+      "joint_names": list(robot.joint_names),
+      "joint_stiffness": joint_stiffness.tolist(),
+      "joint_damping": joint_damping.tolist(),
+      "default_joint_pos": robot.data.default_joint_pos[0].cpu().tolist(),
+      "command_names": list(env.command_manager.active_terms),
+      "observation_names": env.observation_manager.active_terms["actor"],
+      "action_scale": _action_scale_list(joint_action),
+    }
+  # Tendon-effort (e.g. MyoLeg): no joint actuators, minimal metadata.
+  action_term = env.action_manager.get_term("tendon_effort")
+  default_joint = (
+    robot.data.default_joint_pos[0].cpu().tolist()
+    if robot.data.default_joint_pos is not None
+    else []
+  )
   return {
     "run_path": run_path,
     "joint_names": list(robot.joint_names),
-    "joint_stiffness": joint_stiffness.tolist(),
-    "joint_damping": joint_damping.tolist(),
-    "default_joint_pos": robot.data.default_joint_pos[0].cpu().tolist(),
+    "joint_stiffness": [],
+    "joint_damping": [],
+    "default_joint_pos": default_joint,
     "command_names": list(env.command_manager.active_terms),
     "observation_names": env.observation_manager.active_terms["actor"],
-    "action_scale": joint_action._scale[0].cpu().tolist()
-    if isinstance(joint_action._scale, torch.Tensor)
-    else joint_action._scale,
+    "action_scale": _action_scale_list(action_term),
   }
 
 
