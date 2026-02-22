@@ -16,6 +16,7 @@ def myoskeleton_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
       obs_normalization=True,
       stochastic=True,
       init_noise_std=1.0,
+      noise_std_type="log",  # Keep std = exp(log_std) > 0 to avoid "normal expects std >= 0"
     ),
     critic=RslRlModelCfg(
       hidden_dims=(512, 256, 128),
@@ -60,6 +61,7 @@ def myoskeleton_standing_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
       obs_normalization=True,
       stochastic=True,
       init_noise_std=0.5,
+      noise_std_type="log",  # Keep std = exp(log_std) > 0 to avoid "normal expects std >= 0"
     ),
     critic=RslRlModelCfg(
       hidden_dims=(512, 256, 128),

@@ -184,7 +184,8 @@ class Scene:
     for ent_name, ent_cfg in self._cfg.entities.items():
       ent = ent_cfg.build()
       self._entities[ent_name] = ent
-      # Extract keyframe before attach (must delete before attach to avoid corruption).
+      # Extract keyframe before attach (must delete all keys before attach to avoid
+      # repeated key names: remaining keys would get prefix "robot/" and duplicate).
       if ent.spec.keys:
         if len(ent.spec.keys) > 1:
           warnings.warn(
@@ -194,7 +195,8 @@ class Scene:
           )
         key_qpos.append(np.array(ent.spec.keys[0].qpos))
         key_ctrl.append(np.array(ent.spec.keys[0].ctrl))
-        ent.spec.delete(ent.spec.keys[0])
+        while ent.spec.keys:
+          ent.spec.delete(ent.spec.keys[0])
       frame = self._spec.worldbody.add_frame()
       self._spec.attach(ent.spec, prefix=f"{ent_name}/", frame=frame)
     # Add merged keyframe to scene spec.

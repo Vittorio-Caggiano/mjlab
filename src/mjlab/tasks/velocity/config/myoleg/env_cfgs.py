@@ -73,6 +73,36 @@ def myoleg_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     "base_ang_vel"
   ]
 
+  # Muscle state and COM (myoLegWalk-style observations).
+  cfg.observations["actor"].terms["tendon_length"] = ObservationTermCfg(
+    func=mdp.tendon_length,
+    params={"asset_cfg": SceneEntityCfg("robot")},
+  )
+  cfg.observations["actor"].terms["tendon_velocity"] = ObservationTermCfg(
+    func=mdp.tendon_velocity,
+    params={"asset_cfg": SceneEntityCfg("robot")},
+  )
+  cfg.observations["actor"].terms["actuator_force"] = ObservationTermCfg(
+    func=mdp.actuator_force,
+    params={"asset_cfg": SceneEntityCfg("robot")},
+  )
+  cfg.observations["actor"].terms["com_pos"] = ObservationTermCfg(
+    func=mdp.com_pos_w,
+    params={"asset_cfg": SceneEntityCfg("robot")},
+  )
+  cfg.observations["actor"].terms["com_lin_vel"] = ObservationTermCfg(
+    func=mdp.com_lin_vel_w,
+    params={"asset_cfg": SceneEntityCfg("robot")},
+  )
+  for key in [
+    "tendon_length",
+    "tendon_velocity",
+    "actuator_force",
+    "com_pos",
+    "com_lin_vel",
+  ]:
+    cfg.observations["critic"].terms[key] = cfg.observations["actor"].terms[key]
+
   # No height scan on flat ground.
   if "height_scan" in cfg.observations["actor"].terms:
     del cfg.observations["actor"].terms["height_scan"]
@@ -152,6 +182,7 @@ def myoleg_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   ]:
     if name in cfg.rewards:
       cfg.rewards[name].weight = 2.0
+  cfg.rewards["soft_landing"].weight = 0.002
 
   # Same terminations as MyoSkeleton flat; min height 0.8 for parity with myoLegWalk-v0.
   cfg.terminations["fell_over"].params["limit_angle"] = 1.0
