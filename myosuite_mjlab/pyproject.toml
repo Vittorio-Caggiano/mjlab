@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "myosuite_mjlab"
+version = "0.1.0"
+description = "Minimal MyoSuite task integration package for mjlab"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "mjlab",
+  "mujoco>=3.2",
+  "torch",
+  "rsl-rl-lib",
+  "myosuite",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/myosuite_mjlab"]
+
+[tool.ruff]
+line-length = 88
