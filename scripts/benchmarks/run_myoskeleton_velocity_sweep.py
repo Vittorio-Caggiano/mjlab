@@ -316,7 +316,9 @@ def _find_latest_run(experiment_root: Path, before_ts: float) -> Path | None:
 
 
 # Task IDs for velocity sweep (video is passed via --video to train script).
-VELOCITY_TASK_MYOSKELETON = "Mjlab-Velocity-Flat-MyoSkeleton"
+VELOCITY_TASK_MODEL = "Mjlab-Velocity-Flat-MyoSkeleton"
+# VELOCITY_TASK_MODEL = "Mjlab-Velocity-Flat-MyoLeg"
+# VELOCITY_TASK_MODEL = "Mjlab-Velocity-Flat-MyoLegsTorso"
 
 
 def run_case(
@@ -441,7 +443,7 @@ def main() -> None:
       parser.error(f"Unknown cases: {unknown}. Use --list to see available cases.")
     selected = [all_cases[n] for n in args.cases]
 
-  task_id = VELOCITY_TASK_MYOSKELETON
+  task_id = VELOCITY_TASK_MODEL
 
   experiment_name = "myoskeleton_velocity"
 
