@@ -60,8 +60,18 @@ def get_base_metadata(
       "observation_names": env.observation_manager.active_terms["actor"],
       "action_scale": _action_scale_list(joint_action),
     }
-  # Tendon-effort (e.g. MyoLeg): no joint actuators, minimal metadata.
-  action_term = env.action_manager.get_term("tendon_effort")
+  # Tendon-effort or tendon-synergy (e.g. MyoLeg, MyoLegsTorso): no joint actuators.
+  if "tendon_effort" in env.action_manager.cfg:
+    action_term = env.action_manager.get_term("tendon_effort")
+    action_scale = _action_scale_list(action_term)
+  elif "tendon_synergy" in env.action_manager.cfg:
+    action_term = env.action_manager.get_term("tendon_synergy")
+    action_scale = [1.0] * action_term.action_dim
+  else:
+    raise KeyError(
+      "Expected joint_pos, tendon_effort, or tendon_synergy action. "
+      f"Got: {list(env.action_manager.cfg.keys())}"
+    )
   default_joint = (
     robot.data.default_joint_pos[0].cpu().tolist()
     if robot.data.default_joint_pos is not None
@@ -75,7 +85,7 @@ def get_base_metadata(
     "default_joint_pos": default_joint,
     "command_names": list(env.command_manager.active_terms),
     "observation_names": env.observation_manager.active_terms["actor"],
-    "action_scale": _action_scale_list(action_term),
+    "action_scale": action_scale,
   }
 
 

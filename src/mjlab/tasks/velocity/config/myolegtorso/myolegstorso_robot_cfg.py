@@ -23,7 +23,11 @@ assert MYOLEGSSTORSO_MJLAB_XML.exists(), f"Missing {MYOLEGSSTORSO_MJLAB_XML}"
 
 def get_myolegstorso_spec() -> mujoco.MjSpec:
   """Load the MyoLeg entity-only MjSpec (robot, no terrain)."""
-  return mujoco.MjSpec.from_file(str(MYOLEGSSTORSO_MJLAB_XML))
+  spec = mujoco.MjSpec.from_file(str(MYOLEGSSTORSO_MJLAB_XML))
+  # Force SPARSE Jacobian to trigger the correct branch in mujoco_warp/mjlab
+  # This avoids a reshape ValueError for models with many tendons.
+  spec.option.jacobian = mujoco.mjtJacobian.mjJAC_SPARSE
+  return spec
 
 
 # Wrap all XML-defined muscle actuators (they target tendons).

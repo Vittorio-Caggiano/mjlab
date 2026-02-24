@@ -60,7 +60,7 @@ class MujocoCfg:
   cone: Literal["pyramidal", "elliptic"] = "pyramidal"
 
   # Solver settings.
-  jacobian: Literal["auto", "dense", "sparse"] = "auto"
+  jacobian: Literal["auto", "dense", "sparse"] = "sparse"
   solver: Literal["newton", "cg", "pgs"] = "newton"
   iterations: int = 100
   tolerance: float = 1e-8

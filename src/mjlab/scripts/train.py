@@ -10,6 +10,15 @@ from typing import Literal, cast
 
 import tyro
 
+# Set OpenGL backend before any import that loads mujoco (e.g. mjlab.envs).
+# MuJoCo reads MUJOCO_GL when the native library is first loaded; setting it
+# later in launch_training() is too late.
+if not os.environ.get("MUJOCO_GL"):
+  os.environ["MUJOCO_GL"] = "egl"
+if not os.environ.get("MUJOCO_EGL_DEVICE_ID"):
+  os.environ["MUJOCO_EGL_DEVICE_ID"] = "0"
+
+
 from mjlab.envs import ManagerBasedRlEnv, ManagerBasedRlEnvCfg
 from mjlab.managers.curriculum_manager import resolve_curriculum_iterations
 from mjlab.rl import MjlabOnPolicyRunner, RslRlOnPolicyRunnerCfg, RslRlVecEnvWrapper
@@ -170,9 +179,14 @@ def run_train(task_id: str, cfg: TrainConfig, log_dir: Path) -> None:
     dump_yaml(log_dir / "params" / "env.yaml", env_cfg)
     dump_yaml(log_dir / "params" / "agent.yaml", agent_cfg)
 
-  runner.learn(
-    num_learning_iterations=cfg.agent.max_iterations, init_at_random_ep_len=True
-  )
+  try:
+    runner.learn(
+      num_learning_iterations=cfg.agent.max_iterations, init_at_random_ep_len=True
+    )
+  except KeyboardInterrupt:
+    print("\n[INFO] Training interrupted by user (Ctrl+C).", flush=True)
+    env.close()
+    sys.exit(130)
 
   env.close()
 

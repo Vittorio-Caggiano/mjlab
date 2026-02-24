@@ -22,3 +22,9 @@ from mjlab.envs.mdp.actions.actions import TendonVelocityAction as TendonVelocit
 from mjlab.envs.mdp.actions.actions import (
   TendonVelocityActionCfg as TendonVelocityActionCfg,
 )
+from mjlab.envs.mdp.actions.synergy_tendon import (
+  SynergyTendonEffortAction as SynergyTendonEffortAction,
+)
+from mjlab.envs.mdp.actions.synergy_tendon import (
+  SynergyTendonEffortActionCfg as SynergyTendonEffortActionCfg,
+)

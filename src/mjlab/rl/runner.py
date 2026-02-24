@@ -104,7 +104,62 @@ class MjlabOnPolicyRunner(OnPolicyRunner):
       loaded_dict["actor_state_dict"] = actor_state_dict
       loaded_dict["critic_state_dict"] = critic_state_dict
 
-    load_iteration = self.alg.load(loaded_dict, load_cfg, strict)
+    # Optionally relax loading when architecture changes (e.g. different
+    # observation dimensions between tasks). We filter out any state_dict
+    # entries whose shapes do not match the current model before calling
+    # into rsl_rl, and downgrade to non-strict loading in that case.
+    had_mismatch = False
+
+    def _filter_mismatched(src: dict, target: dict) -> dict:
+      nonlocal had_mismatch
+      if not src:
+        return src
+      filtered: dict = {}
+      for key, value in src.items():
+        tgt = target.get(key)
+        if tgt is None or getattr(value, "shape", None) != getattr(tgt, "shape", None):
+          had_mismatch = True
+          continue
+        filtered[key] = value
+      return filtered
+
+    # Filter actor / critic parameters against the current algorithm models.
+    if "actor_state_dict" in loaded_dict and hasattr(self.alg, "actor"):
+      actor_state = loaded_dict["actor_state_dict"]
+      target_actor_state = self.alg.actor.state_dict()  # type: ignore[attr-defined]
+      loaded_dict["actor_state_dict"] = _filter_mismatched(
+        actor_state, target_actor_state
+      )
+
+    if "critic_state_dict" in loaded_dict and hasattr(self.alg, "critic"):
+      critic_state = loaded_dict["critic_state_dict"]
+      target_critic_state = self.alg.critic.state_dict()  # type: ignore[attr-defined]
+      loaded_dict["critic_state_dict"] = _filter_mismatched(
+        critic_state, target_critic_state
+      )
+
+    # If we dropped any parameters, avoid loading optimizer / RND states and
+    # use non-strict loading so missing keys are allowed.
+    effective_strict = strict
+    if had_mismatch:
+      if load_cfg is None:
+        load_cfg = {
+          "actor": True,
+          "critic": True,
+          "optimizer": False,
+          "iteration": True,
+          "rnd": False,
+        }
+      else:
+        load_cfg = {**load_cfg}
+        load_cfg["optimizer"] = False
+        load_cfg.setdefault("actor", True)
+        load_cfg.setdefault("critic", True)
+        load_cfg.setdefault("iteration", True)
+        load_cfg.setdefault("rnd", False)
+      effective_strict = False
+
+    load_iteration = self.alg.load(loaded_dict, load_cfg, effective_strict)
     if load_iteration:
       self.current_learning_iteration = loaded_dict["iter"]
 

@@ -1,12 +1,13 @@
-"""Minimal benchmark for MyoLegTorso velocity task (muscle-controlled).
+"""Benchmark sweep for MyoLegTorso velocity task (muscle-controlled).
 
-Runs a short training run for Mjlab-Velocity-Flat-MyoLegTorso to verify training works.
-Single baseline case; no sweep axes (tendon effort action, no stiffness overrides).
+Runs training for baseline and two trunk-facilitation sweeps:
+1. Standing curriculum: upright only for 2500 steps, then forward locomotion.
+2. Trunk scale: trunk tendon action scale 0.4, same standing-then-locomotion curriculum.
 
 Usage:
     uv run python scripts/benchmarks/run_myolegtorso_velocity_sweep.py
-    uv run python scripts/benchmarks/run_myolegtorso_velocity_sweep.py --max-iterations 200
-    uv run python scripts/benchmarks/run_myolegtorso_velocity_sweep.py --no-video
+    uv run python scripts/benchmarks/run_myolegtorso_velocity_sweep.py --cases curriculum trunk_scale
+    uv run python scripts/benchmarks/run_myolegtorso_velocity_sweep.py --max-iterations 200 --no-video
 """
 
 from __future__ import annotations
@@ -18,19 +19,23 @@ import shlex
 import subprocess
 import sys
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[2] / "src"))
 
 VELOCITY_TASK_MYOLEGTORSO = "Mjlab-Velocity-Flat-MyoLegsTorso"
+TASK_STANDING_CURRICULUM = "Mjlab-Velocity-Flat-MyoLegsTorso-StandingCurriculum"
+TASK_TRUNK_SCALE = "Mjlab-Velocity-Flat-MyoLegsTorso-TrunkScale"
+TASK_SYNERGY = "Mjlab-Velocity-Flat-MyoLegsTorso-Synergy"
 
 
 @dataclass(frozen=True)
 class Case:
   name: str
-  overrides: tuple[str, ...]
+  overrides: tuple[str, ...] = ()
   description: str = ""
+  task_id: str | None = field(default=None)
 
 
 @dataclass
@@ -41,6 +46,7 @@ class RunResult:
   duration_s: float
   log_dir: str
   command: str
+  task_id: str = ""
   final_reward: float | None = None
   notes: str = ""
 
@@ -55,6 +61,25 @@ def _all_cases() -> dict[str, Case]:
       name="baseline",
       overrides=(),
       description="Registered MyoLegTorso config: tendon effort, flat terrain.",
+      task_id=None,
+    ),
+    "curriculum": Case(
+      name="curriculum",
+      overrides=(),
+      description="Standing only 2500 steps, then forward locomotion.",
+      task_id=TASK_STANDING_CURRICULUM,
+    ),
+    "trunk_scale": Case(
+      name="trunk_scale",
+      overrides=(),
+      description="Trunk tendon scale 0.4, standing 2500 steps then locomotion.",
+      task_id=TASK_TRUNK_SCALE,
+    ),
+    "synergy": Case(
+      name="synergy",
+      overrides=(),
+      description="Synergy-based tendon action space (StandingBalance-style grouping).",
+      task_id=TASK_SYNERGY,
     ),
   }
 
@@ -62,7 +87,7 @@ def _all_cases() -> dict[str, Case]:
 def run_case(
   case: Case,
   *,
-  task_id: str,
+  default_task_id: str,
   max_iterations: int,
   save_interval: int,
   num_envs: int,
@@ -71,6 +96,7 @@ def run_case(
   video: bool,
 ) -> RunResult:
   """Run a single training case."""
+  task_id = case.task_id if case.task_id is not None else default_task_id
   cmd = [
     sys.executable,
     "-m",
@@ -125,6 +151,7 @@ def run_case(
     duration_s=duration,
     log_dir=run_dir,
     command=shlex.join(cmd),
+    task_id=task_id,
     final_reward=final_reward,
     notes=notes,
   )
@@ -183,17 +210,19 @@ def main() -> None:
   )
   output_dir.mkdir(parents=True, exist_ok=True)
 
-  print(f"[sweep] Task: {VELOCITY_TASK_MYOLEGTORSO}")
+  task_ids_used = {c.task_id or VELOCITY_TASK_MYOLEGTORSO for c in selected}
+  print(f"[sweep] Tasks: {task_ids_used}")
   print(f"[sweep] Cases: {len(selected)}, max_iterations={args.max_iterations}")
   print(f"[sweep] Output: {output_dir}")
   print()
 
   results: list[RunResult] = []
   for idx, case in enumerate(selected, 1):
-    print(f"[{idx}/{len(selected)}] {case.name}: {case.description}")
+    task_id = case.task_id or VELOCITY_TASK_MYOLEGTORSO
+    print(f"[{idx}/{len(selected)}] {case.name} ({task_id}): {case.description}")
     result = run_case(
       case,
-      task_id=VELOCITY_TASK_MYOLEGTORSO,
+      default_task_id=VELOCITY_TASK_MYOLEGTORSO,
       max_iterations=args.max_iterations,
       save_interval=args.save_interval,
       num_envs=args.num_envs,
