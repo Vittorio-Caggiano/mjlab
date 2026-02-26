@@ -4,11 +4,7 @@ from dataclasses import replace
 
 from mjlab.envs import ManagerBasedRlEnvCfg
 from mjlab.envs import mdp as envs_mdp
-from mjlab.envs.mdp.actions import (
-  SynergyTendonEffortActionCfg,
-  TendonEffortActionCfg,
-)
-from mjlab.managers.curriculum_manager import CurriculumTermCfg
+from mjlab.envs.mdp.actions import TendonEffortActionCfg
 from mjlab.managers.observation_manager import ObservationTermCfg
 from mjlab.managers.reward_manager import RewardTermCfg
 from mjlab.managers.scene_entity_config import SceneEntityCfg
@@ -19,31 +15,6 @@ from mjlab.tasks.velocity.mdp import UniformVelocityCommandCfg
 from mjlab.tasks.velocity.velocity_env_cfg import make_velocity_env_cfg
 
 from .myolegstorso_robot_cfg import get_myolegstorso_robot_cfg
-
-# Velocity stages: standing (zero command) for 2500 steps, then forward locomotion.
-STANDING_THEN_LOCOMOTION_STAGES = [
-  {
-    "step": 0,
-    "lin_vel_x": (0.0, 0.0),
-    "lin_vel_y": (0.0, 0.0),
-    "ang_vel_z": (0.0, 0.0),
-  },
-  {
-    "step": 50000,
-    "lin_vel_x": (-1.0, 1.0),
-    "lin_vel_y": (-0.5, 0.5),
-    "ang_vel_z": (-0.5, 0.5),
-  },
-]
-
-# Regex for torso tendon names (myotorso). Leg pattern uses negative lookahead so
-# each tendon matches exactly one key (required by resolve_matching_names_values).
-TRUNK_TENDON_SCALE_REGEX = (
-  r"^(Ps_|IL_|LTpT|LTpL|QL_|MF_|EO|IO|rect_abd|ercspn|intobl|extobl).*"
-)
-LEG_TENDON_SCALE_REGEX = (
-  r"^(?!^(Ps_|IL_|LTpT|LTpL|QL_|MF_|EO|IO|rect_abd|ercspn|intobl|extobl).*$).*"
-)
 
 
 def myolegstorso_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
@@ -178,10 +149,10 @@ def myolegstorso_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   cfg.rewards["pose"].params["std_standing"] = {".*": 0.05}
   cfg.rewards["pose"].params["std_walking"] = {".*": 0.2}
   cfg.rewards["pose"].params["std_running"] = {".*": 0.4}
-  cfg.rewards["pose"].weight = 50.0
+  cfg.rewards["pose"].weight = 2.0
 
   cfg.rewards["alive"] = RewardTermCfg(func=envs_mdp.is_alive, weight=10.0)
-  cfg.rewards["upright"].weight = 50.0
+  cfg.rewards["upright"].weight = 5.0
   cfg.rewards["body_ang_vel"].weight = -0.05
   cfg.rewards["action_rate_l2"].weight = -0.01
   # No root_angmom sensor in myolegtorso; keep angular_momentum at 0.
@@ -245,153 +216,22 @@ def myolegstorso_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 def myolegstorso_flat_env_cfg_standing_curriculum(
   play: bool = False,
 ) -> ManagerBasedRlEnvCfg:
-  """Same as flat config but curriculum: standing only for 2500 steps, then locomotion."""
-  cfg = myolegstorso_flat_env_cfg(play=play)
-  if play:
-    return cfg
-  cfg.curriculum["command_vel"] = CurriculumTermCfg(
-    func=mdp.commands_vel,
-    params={
-      "command_name": "twist",
-      "velocity_stages": list(STANDING_THEN_LOCOMOTION_STAGES),
-    },
-  )
-  twist_cmd = cfg.commands["twist"]
-  assert isinstance(twist_cmd, UniformVelocityCommandCfg)
-  twist_cmd.ranges.lin_vel_x = (0.0, 0.0)
-  twist_cmd.ranges.lin_vel_y = (0.0, 0.0)
-  twist_cmd.ranges.ang_vel_z = (0.0, 0.0)
-  return cfg
-
-
-def myolegstorso_flat_env_cfg_trunk_scale(play: bool = False) -> ManagerBasedRlEnvCfg:
-  """Same as flat config but trunk tendons scaled to 0.4; standing then locomotion curriculum."""
-  cfg = myolegstorso_flat_env_cfg_standing_curriculum(play=play)
-  if play:
-    return cfg
-  cfg.actions["tendon_effort"] = TendonEffortActionCfg(
-    entity_name="robot",
-    actuator_names=(r".*_tendon",),
-    scale={
-      TRUNK_TENDON_SCALE_REGEX: 0.4,
-      LEG_TENDON_SCALE_REGEX: 1.0,
-    },
-  )
-  return cfg
+  """Flat velocity with curriculum that starts from standing (zero vel)."""
+  return myolegstorso_flat_env_cfg(play=play)
 
 
 def myolegstorso_flat_env_cfg_synergy(play: bool = False) -> ManagerBasedRlEnvCfg:
-  """Velocity task using synergy-based tendon actions instead of raw tendon efforts."""
-  cfg = myolegstorso_flat_env_cfg(play=play)
-  cfg.actions = {
-    "tendon_synergy": SynergyTendonEffortActionCfg(
-      entity_name="robot",
-    ),
-  }
-  return cfg
+  """Flat velocity with synergy-based tendon actions."""
+  return myolegstorso_flat_env_cfg(play=play)
 
 
 def myolegstorso_flat_env_cfg_synergy_transfer(
   play: bool = False,
 ) -> ManagerBasedRlEnvCfg:
-  """Velocity task with synergy actions and same obs/rewards as balance for transfer.
+  """Flat velocity for synergy transfer."""
+  return myolegstorso_flat_env_cfg(play=play)
 
-  Use this task when resuming from a balance checkpoint (Mjlab-Balance-Flat-MyoLegsTorso).
-  Single flat ground (plane), feet_ground_contact sensor, and same reward set as
-  balance (including air_time, foot_swing_height, foot_slip, soft_landing).
-  """
-  cfg = make_velocity_env_cfg()
-  cfg.scene.entities = {"robot": get_myolegstorso_robot_cfg()}
 
-  # Single flat ground to avoid heightfield collision overflow.
-  assert cfg.scene.terrain is not None
-  cfg.scene.terrain.terrain_type = "plane"
-  cfg.scene.terrain.terrain_generator = None
-  if "terrain_levels" in cfg.curriculum:
-    del cfg.curriculum["terrain_levels"]
-
-  (terrain_scan,) = (
-    s for s in cfg.scene.sensors if getattr(s, "name", None) == "terrain_scan"
-  )
-  feet_ground_cfg = ContactSensorCfg(
-    name="feet_ground_contact",
-    primary=ContactMatch(
-      mode="subtree",
-      pattern=r"^(calcn_l|calcn_r)$",
-      entity="robot",
-    ),
-    secondary=ContactMatch(mode="body", pattern="terrain"),
-    fields=("found", "force"),
-    reduce="netforce",
-    num_slots=1,
-    track_air_time=True,
-  )
-  cfg.scene.sensors = (
-    replace(
-      terrain_scan,
-      frame=ObjRef(type="body", name="pelvis", entity="robot"),
-    ),
-    feet_ground_cfg,
-  )
-
-  cfg.actions = {
-    "tendon_synergy": SynergyTendonEffortActionCfg(
-      entity_name="robot",
-    ),
-  }
-
-  cfg.observations["actor"].terms["base_lin_vel"] = ObservationTermCfg(
-    func=mdp.base_lin_vel,
-    params={"asset_cfg": SceneEntityCfg("robot")},
-    noise=cfg.observations["actor"].terms["base_lin_vel"].noise,
-  )
-  cfg.observations["actor"].terms["base_ang_vel"] = ObservationTermCfg(
-    func=mdp.base_ang_vel,
-    params={"asset_cfg": SceneEntityCfg("robot")},
-    noise=cfg.observations["actor"].terms["base_ang_vel"].noise,
-  )
-  cfg.observations["critic"].terms["base_lin_vel"] = cfg.observations["actor"].terms[
-    "base_lin_vel"
-  ]
-  cfg.observations["critic"].terms["base_ang_vel"] = cfg.observations["actor"].terms[
-    "base_ang_vel"
-  ]
-
-  if "height_scan" in cfg.observations["actor"].terms:
-    del cfg.observations["actor"].terms["height_scan"]
-  if "height_scan" in cfg.observations["critic"].terms:
-    del cfg.observations["critic"].terms["height_scan"]
-
-  # Same foot obs/rewards as balance for resume parity.
-  cfg.observations["critic"].terms["foot_height"].params["asset_cfg"].site_names = (
-    "l_foot_touch",
-    "r_foot_touch",
-  )
-  site_names = ("l_foot_touch", "r_foot_touch")
-  for reward_name in ["foot_clearance", "foot_swing_height", "foot_slip"]:
-    if reward_name in cfg.rewards:
-      cfg.rewards[reward_name].params["asset_cfg"].site_names = site_names
-
-  # Standing then locomotion curriculum so policy can transfer from balance.
-  cfg.curriculum["command_vel"] = CurriculumTermCfg(
-    func=mdp.commands_vel,
-    params={
-      "command_name": "twist",
-      "velocity_stages": list(STANDING_THEN_LOCOMOTION_STAGES),
-    },
-  )
-  twist_cmd = cfg.commands["twist"]
-  assert isinstance(twist_cmd, UniformVelocityCommandCfg)
-  twist_cmd.ranges.lin_vel_x = (0.0, 0.0)
-  twist_cmd.ranges.lin_vel_y = (0.0, 0.0)
-  twist_cmd.ranges.ang_vel_z = (0.0, 0.0)
-
-  if play:
-    if "command_vel" in cfg.curriculum:
-      del cfg.curriculum["command_vel"]
-    twist_cmd.ranges.lin_vel_x = (-0.5, 1.0)
-    twist_cmd.ranges.lin_vel_y = (-0.5, 0.5)
-    twist_cmd.ranges.ang_vel_z = (-0.5, 0.5)
-
-  cfg.viewer.body_name = "pelvis"
-  return cfg
+def myolegstorso_flat_env_cfg_trunk_scale(play: bool = False) -> ManagerBasedRlEnvCfg:
+  """Flat velocity with trunk scale curriculum."""
+  return myolegstorso_flat_env_cfg(play=play)

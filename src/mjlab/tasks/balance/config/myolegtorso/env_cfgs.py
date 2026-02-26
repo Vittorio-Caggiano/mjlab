@@ -86,10 +86,10 @@ def myolegstorso_balance_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
         # {"step": 400_000, "scale": 0.7},
         # {"step": 800_000, "scale": 1.0},
         {"step": 0, "scale": 0.05},
-        {"step": 50_000, "scale": 0.15},
-        {"step": 100_000, "scale": 0.4},
-        {"step": 200_000, "scale": 0.7},
-        {"step": 400_000, "scale": 1.0},
+        {"step": 100_000, "scale": 0.15},
+        {"step": 500_000, "scale": 0.4},
+        {"step": 700_000, "scale": 0.7},
+        {"step": 900_000, "scale": 1.0},
       ],
     },
   )
@@ -173,15 +173,17 @@ def myolegstorso_balance_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   # Use mutually exclusive patterns so each joint matches exactly one (no overlap with .*).
   _spine = r"^(flex_extension|lat_bending|axial_rotation|L[1-4]_L[2-5]_.*)$"
   _other = r"^(?!(?:flex_extension|lat_bending|axial_rotation|L[1-4]_L[2-5]_)).*$"
-  cfg.rewards["pose"].params["std_standing"] = {_spine: 0.012, _other: 0.03}
-  cfg.rewards["pose"].params["std_walking"] = {_spine: 0.04, _other: 0.2}
-  cfg.rewards["pose"].params["std_running"] = {_spine: 0.08, _other: 0.4}
-  cfg.rewards["pose"].weight = 5.0
+  cfg.rewards["pose"].params["std_standing"] = {".*": 0.05}
+  cfg.rewards["pose"].params["std_walking"] = {".*": 0.2}
+  cfg.rewards["pose"].params["std_running"] = {".*": 0.4}
+  cfg.rewards["pose"].weight = 1
 
   # Keep standard alive and body angular velocity penalties.
   cfg.rewards["alive"] = RewardTermCfg(func=envs_mdp.is_alive, weight=10.0)
+  cfg.rewards["dof_pos_limits"] = RewardTermCfg(func=mdp.joint_pos_limits, weight=-10.0)
   cfg.rewards["body_ang_vel"].params["asset_cfg"].body_names = ("pelvis",)
   cfg.rewards["body_ang_vel"].weight = -0.05
+  cfg.rewards["action_rate_l2"].weight = -0.01
 
   # Terminations: relaxed so episodes do not end too early.
   cfg.terminations["fell_over"].params["limit_angle"] = 1.2
